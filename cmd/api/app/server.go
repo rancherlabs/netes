@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -75,6 +76,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault"
 	"k8s.io/kubernetes/plugin/pkg/admission/webhook"
+	"k8s.io/apiserver/pkg/util/flag"
 )
 
 // Run runs the specified APIServer.  This should never exit.
@@ -92,7 +94,11 @@ func Run(stopCh <-chan struct{}) error {
 
 // CreateServerChain creates the apiservers connected via delegation.
 func CreateServerChain(stopCh <-chan struct{}) (*genericapiserver.GenericAPIServer, error) {
-	etcdOptions := genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, api.Scheme, nil))
+	storageConfig := storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, api.Scheme, nil)
+	storageConfig.Type = "etcd3"
+	storageConfig.ServerList = []string{"localhost"}
+
+	etcdOptions := genericoptions.NewEtcdOptions(storageConfig)
 	kubeAPIServerConfig, sharedInformers, err := CreateKubeAPIServerConfig(*etcdOptions)
 	if err != nil {
 		return nil, err
@@ -198,6 +204,8 @@ func CreateKubeAPIServerConfig(etcdOptions genericoptions.EtcdOptions) (*master.
 		return nil, nil, err
 	}
 
+	etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
+
 	config := &master.Config{
 		GenericConfig: genericConfig,
 
@@ -263,6 +271,7 @@ func BuildGenericConfig() (*genericapiserver.Config, informers.SharedInformerFac
 	// Since not every generic apiserver has to support protobufs, we
 	// cannot default to it in generic apiserver and need to explicitly
 	// set it in kube-apiserver.
+	genericConfig.LoopbackClientConfig = &rest.Config{}
 	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
 
 	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
@@ -336,7 +345,9 @@ func BuildStorageFactory(etcd genericoptions.EtcdOptions) (*serverstorage.Defaul
 		serverstorage.NewDefaultResourceEncodingConfig(api.Registry), nil,
 		// FIXME: this GroupVersionResource override should be configurable
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
-		master.DefaultAPIResourceConfigSource(), nil)
+		master.DefaultAPIResourceConfigSource(), flag.ConfigurationMap{
+			"api/all": "true",
+		})
 	if err != nil {
 		return nil, fmt.Errorf("error in initializing storage factory: %s", err)
 	}
