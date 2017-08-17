@@ -7,9 +7,9 @@ const (
 type Project struct {
 	Resource
 
-	AllowSystemRole bool `json:"allowSystemRole,omitempty" yaml:"allow_system_role,omitempty"`
-
 	ClusterId string `json:"clusterId,omitempty" yaml:"cluster_id,omitempty"`
+
+	ClusterOwner bool `json:"clusterOwner,omitempty" yaml:"cluster_owner,omitempty"`
 
 	Created string `json:"created,omitempty" yaml:"created,omitempty"`
 
