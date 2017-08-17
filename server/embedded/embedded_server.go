@@ -131,7 +131,7 @@ func New(config *types.GlobalConfig, cluster *client.Cluster, lookup *cluster.Lo
 }
 
 func serviceNet(config *types.GlobalConfig, cluster *client.Cluster) (net.IPNet, net.IP, error) {
-	cidr := types.FirstNotEmpty(cluster.K8sConfig.ServiceNetCidr, config.ServiceNetCidr)
+	cidr := types.FirstNotEmpty(cluster.K8sServerConfig.ServiceNetCidr, config.ServiceNetCidr)
 	_, cidrNet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return net.IPNet{}, nil, err

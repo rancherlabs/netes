@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/netes/server/embedded"
 	"github.com/rancher/netes/types"
 	"golang.org/x/sync/syncmap"
+	"github.com/rancher/netes/server/imported"
 )
 
 type Factory struct {
@@ -45,6 +46,5 @@ func (s *Factory) newServer(c *client.Cluster) (Server, error) {
 	if c.Embedded {
 		return embedded.New(s.config, c, s.config.Lookup)
 	}
-
-	panic("psst: I don't know what I'm doing. Don't tell anyone.")
+	return imported.New(c)
 }

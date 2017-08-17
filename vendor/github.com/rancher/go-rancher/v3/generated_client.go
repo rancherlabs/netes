@@ -6,8 +6,10 @@ type RancherClient struct {
 	Account                            AccountOperations
 	AddOutputsInput                    AddOutputsInputOperations
 	Agent                              AgentOperations
+	Amazonec2Config                    Amazonec2ConfigOperations
 	ApiKey                             ApiKeyOperations
 	AuditLog                           AuditLogOperations
+	AzureConfig                        AzureConfigOperations
 	Azureadconfig                      AzureadconfigOperations
 	BaseMachineConfig                  BaseMachineConfigOperations
 	BlkioDeviceOption                  BlkioDeviceOptionOperations
@@ -31,6 +33,7 @@ type RancherClient struct {
 	DeploymentSyncRequest              DeploymentSyncRequestOperations
 	DeploymentSyncResponse             DeploymentSyncResponseOperations
 	DeploymentUnit                     DeploymentUnitOperations
+	DigitaloceanConfig                 DigitaloceanConfigOperations
 	DnsService                         DnsServiceOperations
 	DynamicSchema                      DynamicSchemaOperations
 	Error                              ErrorOperations
@@ -55,7 +58,8 @@ type RancherClient struct {
 	InstanceRemove                     InstanceRemoveOperations
 	InstanceStatus                     InstanceStatusOperations
 	InstanceStop                       InstanceStopOperations
-	K8sConfig                          K8sConfigOperations
+	K8sClientConfig                    K8sClientConfigOperations
+	K8sServerConfig                    K8sServerConfigOperations
 	LaunchConfig                       LaunchConfigOperations
 	LbConfig                           LbConfigOperations
 	LbTargetConfig                     LbTargetConfigOperations
@@ -76,6 +80,7 @@ type RancherClient struct {
 	NetworkPolicyRuleMember            NetworkPolicyRuleMemberOperations
 	NetworkPolicyRuleWithin            NetworkPolicyRuleWithinOperations
 	Openldapconfig                     OpenldapconfigOperations
+	PacketConfig                       PacketConfigOperations
 	Password                           PasswordOperations
 	PortRule                           PortRuleOperations
 	ProcessExecution                   ProcessExecutionOperations
@@ -135,8 +140,10 @@ func constructClient(rancherBaseClient *RancherBaseClientImpl) *RancherClient {
 	client.Account = newAccountClient(client)
 	client.AddOutputsInput = newAddOutputsInputClient(client)
 	client.Agent = newAgentClient(client)
+	client.Amazonec2Config = newAmazonec2ConfigClient(client)
 	client.ApiKey = newApiKeyClient(client)
 	client.AuditLog = newAuditLogClient(client)
+	client.AzureConfig = newAzureConfigClient(client)
 	client.Azureadconfig = newAzureadconfigClient(client)
 	client.BaseMachineConfig = newBaseMachineConfigClient(client)
 	client.BlkioDeviceOption = newBlkioDeviceOptionClient(client)
@@ -160,6 +167,7 @@ func constructClient(rancherBaseClient *RancherBaseClientImpl) *RancherClient {
 	client.DeploymentSyncRequest = newDeploymentSyncRequestClient(client)
 	client.DeploymentSyncResponse = newDeploymentSyncResponseClient(client)
 	client.DeploymentUnit = newDeploymentUnitClient(client)
+	client.DigitaloceanConfig = newDigitaloceanConfigClient(client)
 	client.DnsService = newDnsServiceClient(client)
 	client.DynamicSchema = newDynamicSchemaClient(client)
 	client.Error = newErrorClient(client)
@@ -184,7 +192,8 @@ func constructClient(rancherBaseClient *RancherBaseClientImpl) *RancherClient {
 	client.InstanceRemove = newInstanceRemoveClient(client)
 	client.InstanceStatus = newInstanceStatusClient(client)
 	client.InstanceStop = newInstanceStopClient(client)
-	client.K8sConfig = newK8sConfigClient(client)
+	client.K8sClientConfig = newK8sClientConfigClient(client)
+	client.K8sServerConfig = newK8sServerConfigClient(client)
 	client.LaunchConfig = newLaunchConfigClient(client)
 	client.LbConfig = newLbConfigClient(client)
 	client.LbTargetConfig = newLbTargetConfigClient(client)
@@ -205,6 +214,7 @@ func constructClient(rancherBaseClient *RancherBaseClientImpl) *RancherClient {
 	client.NetworkPolicyRuleMember = newNetworkPolicyRuleMemberClient(client)
 	client.NetworkPolicyRuleWithin = newNetworkPolicyRuleWithinClient(client)
 	client.Openldapconfig = newOpenldapconfigClient(client)
+	client.PacketConfig = newPacketConfigClient(client)
 	client.Password = newPasswordClient(client)
 	client.PortRule = newPortRuleClient(client)
 	client.ProcessExecution = newProcessExecutionClient(client)

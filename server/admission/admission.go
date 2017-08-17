@@ -46,7 +46,7 @@ func New(config *types.GlobalConfig, cluster *client.Cluster, authz authorizer.A
 		api.Registry.RESTMapper(),
 		quotainstall.NewRegistry(nil, nil))
 
-	names := types.FirstNotLenZero(cluster.K8sConfig.AdmissionControllers, config.AdmissionControllers)
+	names := types.FirstNotLenZero(cluster.K8sServerConfig.AdmissionControllers, config.AdmissionControllers)
 	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(names,"")
 	if err != nil {
 		return nil, err

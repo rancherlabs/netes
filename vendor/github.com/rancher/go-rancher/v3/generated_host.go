@@ -13,9 +13,13 @@ type Host struct {
 
 	AgentState string `json:"agentState,omitempty" yaml:"agent_state,omitempty"`
 
+	Amazonec2Config *Amazonec2Config `json:"amazonec2Config,omitempty" yaml:"amazonec2config,omitempty"`
+
 	AuthCertificateAuthority string `json:"authCertificateAuthority,omitempty" yaml:"auth_certificate_authority,omitempty"`
 
 	AuthKey string `json:"authKey,omitempty" yaml:"auth_key,omitempty"`
+
+	AzureConfig *AzureConfig `json:"azureConfig,omitempty" yaml:"azure_config,omitempty"`
 
 	ClusterId string `json:"clusterId,omitempty" yaml:"cluster_id,omitempty"`
 
@@ -24,6 +28,8 @@ type Host struct {
 	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
 
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+
+	DigitaloceanConfig *DigitaloceanConfig `json:"digitaloceanConfig,omitempty" yaml:"digitalocean_config,omitempty"`
 
 	DockerVersion string `json:"dockerVersion,omitempty" yaml:"docker_version,omitempty"`
 
@@ -66,6 +72,8 @@ type Host struct {
 	MilliCpu int64 `json:"milliCpu,omitempty" yaml:"milli_cpu,omitempty"`
 
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+
+	PacketConfig *PacketConfig `json:"packetConfig,omitempty" yaml:"packet_config,omitempty"`
 
 	PublicEndpoints []PublicEndpoint `json:"publicEndpoints,omitempty" yaml:"public_endpoints,omitempty"`
 
