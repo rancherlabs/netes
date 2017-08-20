@@ -1,5 +1,0 @@
-package: github.com/rancher/netes
-import:
-- package: k8s.io/kubernetes
-  repo: https://github.com/ibuildthecloud/kubernetes
-  version: rd
