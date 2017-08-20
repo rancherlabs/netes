@@ -41,11 +41,8 @@ type namespaceInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-// NewNamespaceInformer constructs a new informer for Namespace type.
-// Always prefer using an informer factory to get a shared informer instead of getting an independent
-// one. This reduces memory footprint and number of connections to the server.
-func NewNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+func newNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
 				return client.CoreV1().Namespaces().List(options)
@@ -56,16 +53,14 @@ func NewNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duratio
 		},
 		&core_v1.Namespace{},
 		resyncPeriod,
-		indexers,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-}
 
-func defaultNamespaceInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewNamespaceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	return sharedIndexInformer
 }
 
 func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core_v1.Namespace{}, defaultNamespaceInformer)
+	return f.factory.InformerFor(&core_v1.Namespace{}, newNamespaceInformer)
 }
 
 func (f *namespaceInformer) Lister() v1.NamespaceLister {

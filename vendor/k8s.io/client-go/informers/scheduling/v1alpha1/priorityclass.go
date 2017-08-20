@@ -41,11 +41,8 @@ type priorityClassInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-// NewPriorityClassInformer constructs a new informer for PriorityClass type.
-// Always prefer using an informer factory to get a shared informer instead of getting an independent
-// one. This reduces memory footprint and number of connections to the server.
-func NewPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+func newPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.SchedulingV1alpha1().PriorityClasses().List(options)
@@ -56,16 +53,14 @@ func NewPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Dur
 		},
 		&scheduling_v1alpha1.PriorityClass{},
 		resyncPeriod,
-		indexers,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-}
 
-func defaultPriorityClassInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPriorityClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	return sharedIndexInformer
 }
 
 func (f *priorityClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&scheduling_v1alpha1.PriorityClass{}, defaultPriorityClassInformer)
+	return f.factory.InformerFor(&scheduling_v1alpha1.PriorityClass{}, newPriorityClassInformer)
 }
 
 func (f *priorityClassInformer) Lister() v1alpha1.PriorityClassLister {

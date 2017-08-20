@@ -41,11 +41,8 @@ type clusterRoleBindingInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-// NewClusterRoleBindingInformer constructs a new informer for ClusterRoleBinding type.
-// Always prefer using an informer factory to get a shared informer instead of getting an independent
-// one. This reduces memory footprint and number of connections to the server.
-func NewClusterRoleBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+func newClusterRoleBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.RbacV1beta1().ClusterRoleBindings().List(options)
@@ -56,16 +53,14 @@ func NewClusterRoleBindingInformer(client kubernetes.Interface, resyncPeriod tim
 		},
 		&rbac_v1beta1.ClusterRoleBinding{},
 		resyncPeriod,
-		indexers,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-}
 
-func defaultClusterRoleBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewClusterRoleBindingInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	return sharedIndexInformer
 }
 
 func (f *clusterRoleBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac_v1beta1.ClusterRoleBinding{}, defaultClusterRoleBindingInformer)
+	return f.factory.InformerFor(&rbac_v1beta1.ClusterRoleBinding{}, newClusterRoleBindingInformer)
 }
 
 func (f *clusterRoleBindingInformer) Lister() v1beta1.ClusterRoleBindingLister {

@@ -41,31 +41,26 @@ type podPresetInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-// NewPodPresetInformer constructs a new informer for PodPreset type.
-// Always prefer using an informer factory to get a shared informer instead of getting an independent
-// one. This reduces memory footprint and number of connections to the server.
-func NewPodPresetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+func newPodPresetInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.SettingsV1alpha1().PodPresets(namespace).List(options)
+				return client.SettingsV1alpha1().PodPresets(v1.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.SettingsV1alpha1().PodPresets(namespace).Watch(options)
+				return client.SettingsV1alpha1().PodPresets(v1.NamespaceAll).Watch(options)
 			},
 		},
 		&settings_v1alpha1.PodPreset{},
 		resyncPeriod,
-		indexers,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-}
 
-func defaultPodPresetInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPodPresetInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	return sharedIndexInformer
 }
 
 func (f *podPresetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&settings_v1alpha1.PodPreset{}, defaultPodPresetInformer)
+	return f.factory.InformerFor(&settings_v1alpha1.PodPreset{}, newPodPresetInformer)
 }
 
 func (f *podPresetInformer) Lister() v1alpha1.PodPresetLister {
