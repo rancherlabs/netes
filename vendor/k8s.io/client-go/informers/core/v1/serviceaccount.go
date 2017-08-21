@@ -41,31 +41,26 @@ type serviceAccountInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-// NewServiceAccountInformer constructs a new informer for ServiceAccount type.
-// Always prefer using an informer factory to get a shared informer instead of getting an independent
-// one. This reduces memory footprint and number of connections to the server.
-func NewServiceAccountInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+func newServiceAccountInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return client.CoreV1().ServiceAccounts(namespace).List(options)
+				return client.CoreV1().ServiceAccounts(meta_v1.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return client.CoreV1().ServiceAccounts(namespace).Watch(options)
+				return client.CoreV1().ServiceAccounts(meta_v1.NamespaceAll).Watch(options)
 			},
 		},
 		&core_v1.ServiceAccount{},
 		resyncPeriod,
-		indexers,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-}
 
-func defaultServiceAccountInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewServiceAccountInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	return sharedIndexInformer
 }
 
 func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core_v1.ServiceAccount{}, defaultServiceAccountInformer)
+	return f.factory.InformerFor(&core_v1.ServiceAccount{}, newServiceAccountInformer)
 }
 
 func (f *serviceAccountInformer) Lister() v1.ServiceAccountLister {

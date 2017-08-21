@@ -2830,7 +2830,7 @@ message PodStatus {
   optional string message = 3;
 
   // A brief CamelCase message indicating details about why the pod is in this state.
-  // e.g. 'Evicted'
+  // e.g. 'OutOfDisk'
   // +optional
   optional string reason = 4;
 

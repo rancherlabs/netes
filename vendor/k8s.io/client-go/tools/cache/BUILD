@@ -56,7 +56,6 @@ go_library(
         "mutation_cache.go",
         "mutation_detector.go",
         "reflector.go",
-        "reflector_metrics.go",
         "shared_informer.go",
         "store.go",
         "thread_safe_store.go",

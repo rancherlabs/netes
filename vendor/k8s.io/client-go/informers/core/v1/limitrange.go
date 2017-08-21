@@ -41,31 +41,26 @@ type limitRangeInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-// NewLimitRangeInformer constructs a new informer for LimitRange type.
-// Always prefer using an informer factory to get a shared informer instead of getting an independent
-// one. This reduces memory footprint and number of connections to the server.
-func NewLimitRangeInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
+func newLimitRangeInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return client.CoreV1().LimitRanges(namespace).List(options)
+				return client.CoreV1().LimitRanges(meta_v1.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return client.CoreV1().LimitRanges(namespace).Watch(options)
+				return client.CoreV1().LimitRanges(meta_v1.NamespaceAll).Watch(options)
 			},
 		},
 		&core_v1.LimitRange{},
 		resyncPeriod,
-		indexers,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-}
 
-func defaultLimitRangeInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewLimitRangeInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	return sharedIndexInformer
 }
 
 func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core_v1.LimitRange{}, defaultLimitRangeInformer)
+	return f.factory.InformerFor(&core_v1.LimitRange{}, newLimitRangeInformer)
 }
 
 func (f *limitRangeInformer) Lister() v1.LimitRangeLister {
