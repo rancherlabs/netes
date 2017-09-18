@@ -21,9 +21,7 @@ package cadvisor
 import (
 	"flag"
 	"fmt"
-	"net"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -96,7 +94,7 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 }
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(address string, port uint, runtime string, rootPath string) (Interface, error) {
+func New(port uint, runtime string, rootPath string) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	// Create and start the cAdvisor container manager.
@@ -111,7 +109,7 @@ func New(address string, port uint, runtime string, rootPath string) (Interface,
 		Manager:  m,
 	}
 
-	err = cadvisorClient.exportHTTP(address, port)
+	err = cadvisorClient.exportHTTP(port)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +120,7 @@ func (cc *cadvisorClient) Start() error {
 	return cc.Manager.Start()
 }
 
-func (cc *cadvisorClient) exportHTTP(address string, port uint) error {
+func (cc *cadvisorClient) exportHTTP(port uint) error {
 	// Register the handlers regardless as this registers the prometheus
 	// collector properly.
 	mux := http.NewServeMux()
@@ -136,7 +134,7 @@ func (cc *cadvisorClient) exportHTTP(address string, port uint) error {
 	// Only start the http server if port > 0
 	if port > 0 {
 		serv := &http.Server{
-			Addr:    net.JoinHostPort(address, strconv.Itoa(int(port))),
+			Addr:    fmt.Sprintf(":%d", port),
 			Handler: mux,
 		}
 

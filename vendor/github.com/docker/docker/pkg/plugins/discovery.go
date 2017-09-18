@@ -16,6 +16,7 @@ var (
 	// ErrNotFound plugin not found
 	ErrNotFound = errors.New("plugin not found")
 	socketsPath = "/run/docker/plugins"
+	specsPaths  = []string{"/etc/docker/plugins", "/usr/lib/docker/plugins"}
 )
 
 // localRegistry defines a registry that is local (using unix socket).
@@ -63,7 +64,7 @@ func (l *localRegistry) Plugin(name string) (*Plugin, error) {
 
 	for _, p := range socketpaths {
 		if fi, err := os.Stat(p); err == nil && fi.Mode()&os.ModeSocket != 0 {
-			return NewLocalPlugin(name, "unix://"+p), nil
+			return newLocalPlugin(name, "unix://"+p), nil
 		}
 	}
 
@@ -100,7 +101,7 @@ func readPluginInfo(name, path string) (*Plugin, error) {
 		return nil, fmt.Errorf("Unknown protocol")
 	}
 
-	return NewLocalPlugin(name, addr), nil
+	return newLocalPlugin(name, addr), nil
 }
 
 func readPluginJSONInfo(name, path string) (*Plugin, error) {
@@ -114,8 +115,8 @@ func readPluginJSONInfo(name, path string) (*Plugin, error) {
 	if err := json.NewDecoder(f).Decode(&p); err != nil {
 		return nil, err
 	}
-	p.name = name
-	if p.TLSConfig != nil && len(p.TLSConfig.CAFile) == 0 {
+	p.Name = name
+	if len(p.TLSConfig.CAFile) == 0 {
 		p.TLSConfig.InsecureSkipVerify = true
 	}
 	p.activateWait = sync.NewCond(&sync.Mutex{})

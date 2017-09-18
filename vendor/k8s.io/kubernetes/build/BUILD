@@ -21,23 +21,36 @@ filegroup(
     tags = ["automanaged"],
 )
 
+docker_build(
+    name = "busybox",
+    debs = [
+        "@busybox_deb//file",
+    ],
+    symlinks = {
+        "/bin/sh": "/bin/busybox",
+        "/usr/bin/busybox": "/bin/busybox",
+        "/usr/sbin/busybox": "/bin/busybox",
+        "/sbin/busybox": "/bin/busybox",
+    },
+)
+
 # This list should roughly match kube::build::get_docker_wrapped_binaries()
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
     "cloud-controller-manager": {
-        "base": "@official_busybox//image:image.tar",
+        "base": ":busybox",
         "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
     },
     "kube-apiserver": {
-        "base": "@official_busybox//image:image.tar",
+        "base": ":busybox",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": "@official_busybox//image:image.tar",
+        "base": ":busybox",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": "@official_busybox//image:image.tar",
+        "base": ":busybox",
         "target": "//plugin/cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {

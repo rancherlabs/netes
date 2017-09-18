@@ -51,7 +51,8 @@ func (c *client) List(ctx context.Context, key string) ([]*kv.KeyValue, error) {
 
 func (c *client) Create(ctx context.Context, key string, value []byte, ttl uint64) (*kv.KeyValue, error) {
 	if ttl != 0 {
-		panic("TTL != 0 doesn't work right now")
+		fmt.Println("IGNORING!!!! TTL", ttl, " ", string(value))
+		//panic("TTL != 0 doesn't work right now")
 	}
 
 	err := c.dialect.Create(ctx, c.db, key, value, ttl)
@@ -90,7 +91,8 @@ func (c *client) deleteVersion(ctx context.Context, key string, revision *int64)
 
 func (c *client) UpdateOrCreate(ctx context.Context, key string, value []byte, revision int64, ttl uint64) (*kv.KeyValue, error) {
 	if ttl != 0 {
-		panic("TTL != 0 doesn't work right now")
+		fmt.Println("IGNORING UPDATE!!!! TTL", ttl, " ", string(value))
+		//panic("TTL != 0 doesn't work right now")
 	}
 
 	oldKv, newKv, err := c.dialect.Update(ctx, c.db, key, value, revision)

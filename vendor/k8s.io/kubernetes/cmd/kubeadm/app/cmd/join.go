@@ -137,6 +137,10 @@ type Join struct {
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
+	if cfg.NodeName == "" {
+		cfg.NodeName = nodeutil.GetHostname("")
+	}
+
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
@@ -149,6 +153,11 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks")
+
+		// First, check if we're root separately from the other preflight checks and fail fast
+		if err := preflight.RunRootCheckOnly(); err != nil {
+			return nil, err
+		}
 
 		// Then continue with the others...
 		if err := preflight.RunJoinNodeChecks(cfg); err != nil {
@@ -178,6 +187,7 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
+	// Use j.cfg.NodeName if set, otherwise get that from os.Hostname(). This also makes sure the hostname is lower-cased
 	hostname := nodeutil.GetHostname(j.cfg.NodeName)
 
 	client, err := kubeconfigutil.KubeConfigToClientSet(cfg)
@@ -191,7 +201,7 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
+	kubeconfigFile := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
 	if err := kubeconfigutil.WriteToDisk(kubeconfigFile, cfg); err != nil {
 		return err
 	}

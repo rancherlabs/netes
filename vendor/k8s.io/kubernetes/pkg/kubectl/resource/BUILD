@@ -26,6 +26,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
+        "//pkg/apis/extensions:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/text/encoding/unicode:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",
@@ -66,9 +67,9 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

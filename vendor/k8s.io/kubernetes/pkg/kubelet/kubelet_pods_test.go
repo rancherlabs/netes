@@ -26,7 +26,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,10 +34,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	// TODO: remove this import if
-	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
-	// to "v1"?
-	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
@@ -1723,7 +1719,7 @@ func TestExec(t *testing.T) {
 		tty                    = true
 	)
 	var (
-		podFullName = kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, podName, podNamespace))
+		podFullName = kubecontainer.GetPodFullName(podWithUidNameNs(podUID, podName, podNamespace))
 		command     = []string{"ls"}
 		stdin       = &bytes.Buffer{}
 		stdout      = &fakeReadWriteCloser{}
@@ -1859,7 +1855,7 @@ func TestPortForward(t *testing.T) {
 			}},
 		}
 
-		podFullName := kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, tc.podName, podNamespace))
+		podFullName := kubecontainer.GetPodFullName(podWithUidNameNs(podUID, tc.podName, podNamespace))
 		{ // No streaming case
 			description := "no streaming - " + tc.description
 			redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})

@@ -1,30 +1,22 @@
----
-title: "pull"
-description: "The pull command description and usage"
-keywords: "pull, image, hub, docker"
----
-
-<!-- This file is maintained within the docker/docker Github
-     repository at https://github.com/docker/docker/. Make all
-     pull requests against that repo. If you see this file in
-     another repository, consider it read-only there, as it will
-     periodically be overwritten by the definitive file. Pull
-     requests which include edits to this file in other repositories
-     will be rejected.
--->
+<!--[metadata]>
++++
+title = "pull"
+description = "The pull command description and usage"
+keywords = ["pull, image, hub, docker"]
+[menu.main]
+parent = "smn_cli"
++++
+<![end-metadata]-->
 
 # pull
 
-```markdown
-Usage:  docker pull [OPTIONS] NAME[:TAG|@DIGEST]
+    Usage: docker pull [OPTIONS] NAME[:TAG] | [REGISTRY_HOST[:REGISTRY_PORT]/]NAME[:TAG]
 
-Pull an image or a repository from a registry
+    Pull an image or a repository from the registry
 
-Options:
-  -a, --all-tags                Download all tagged images in the repository
-      --disable-content-trust   Skip image verification (default true)
-      --help                    Print usage
-```
+      -a, --all-tags                Download all tagged images in the repository
+      --disable-content-trust=true  Skip image verification
+      --help                        Print usage
 
 Most of your images will be created on top of a base image from the
 [Docker Hub](https://hub.docker.com) registry.
@@ -34,22 +26,6 @@ can `pull` and try without needing to define and configure your own.
 
 To download a particular image, or set of images (i.e., a repository),
 use `docker pull`.
-
-## Proxy configuration
-
-If you are behind an HTTP proxy server, for example in corporate settings,
-before open a connect to registry, you may need to configure the Docker
-daemon's proxy settings, using the `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY`
-environment variables. To set these environment variables on a host using
-`systemd`, refer to the [control and configure Docker with systemd](https://docs.docker.com/engine/admin/systemd/#http-proxy)
-for variables configuration.
-
-## Concurrent downloads
-
-By default the Docker daemon will pull three layers of an image at a time.
-If you are on a low bandwidth connection this may cause timeout issues and you may want to lower
-this via the `--max-concurrent-downloads` daemon option. See the
-[daemon documentation](dockerd.md) for more details.
 
 ## Examples
 
@@ -107,7 +83,7 @@ same image, their layers are stored only once and do not consume extra disk
 space.
 
 For more information about images, layers, and the content-addressable store,
-refer to [understand images, containers, and storage drivers](https://docs.docker.com/engine/userguide/storagedriver/imagesandcontainers/).
+refer to [understand images, containers, and storage drivers](../../userguide/storagedriver/imagesandcontainers.md).
 
 
 ## Pull an image by digest (immutable identifier)
@@ -147,7 +123,7 @@ above, the digest of the image is:
 Docker also prints the digest of an image when *pushing* to a registry. This
 may be useful if you want to pin to a version of the image you just pushed.
 
-A digest takes the place of the tag when pulling an image, for example, to
+A digest takes the place of the tag when pulling an image, for example, to 
 pull the above image by digest, run the following command:
 
 ```bash
@@ -170,14 +146,14 @@ MAINTAINER some maintainer <maintainer@example.com>
 ```
 
 > **Note**: Using this feature "pins" an image to a specific version in time.
-> Docker will therefore not pull updated versions of an image, which may include
+> Docker will therefore not pull updated versions of an image, which may include 
 > security updates. If you want to pull an updated image, you need to change the
 > digest accordingly.
 
 
 ## Pulling from a different registry
 
-By default, `docker pull` pulls images from [Docker Hub](https://hub.docker.com). It is also possible to
+By default, `docker pull` pulls images from Docker Hub. It is also possible to
 manually specify the path of a registry to pull from. For example, if you have
 set up a local registry, you can specify its path to pull from it. A registry
 path is similar to a URL, but does not contain a protocol specifier (`https://`).
@@ -193,7 +169,7 @@ Registry credentials are managed by [docker login](login.md).
 
 Docker uses the `https://` protocol to communicate with a registry, unless the
 registry is allowed to be accessed over an insecure connection. Refer to the
-[insecure registries](dockerd.md#insecure-registries) section for more information.
+[insecure registries](daemon.md#insecure-registries) section for more information.
 
 
 ## Pull a repository with multiple images

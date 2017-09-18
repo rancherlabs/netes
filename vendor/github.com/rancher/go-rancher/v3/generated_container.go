@@ -35,7 +35,7 @@ type Container struct {
 
 	CpuQuota int64 `json:"cpuQuota,omitempty" yaml:"cpu_quota,omitempty"`
 
-	CpuSet string `json:"cpuSet,omitempty" yaml:"cpu_set,omitempty"`
+	CpuSetCpu string `json:"cpuSetCpu,omitempty" yaml:"cpu_set_cpu,omitempty"`
 
 	CpuSetMems string `json:"cpuSetMems,omitempty" yaml:"cpu_set_mems,omitempty"`
 
@@ -43,9 +43,9 @@ type Container struct {
 
 	CreateIndex int64 `json:"createIndex,omitempty" yaml:"create_index,omitempty"`
 
-	Created string `json:"created,omitempty" yaml:"created,omitempty"`
+	CreateOnly bool `json:"createOnly,omitempty" yaml:"create_only,omitempty"`
 
-	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
+	Created string `json:"created,omitempty" yaml:"created,omitempty"`
 
 	DataVolumeMounts map[string]interface{} `json:"dataVolumeMounts,omitempty" yaml:"data_volume_mounts,omitempty"`
 
@@ -77,7 +77,7 @@ type Container struct {
 
 	EntryPoint []string `json:"entryPoint,omitempty" yaml:"entry_point,omitempty"`
 
-	Environment map[string]interface{} `json:"environment,omitempty" yaml:"environment,omitempty"`
+	Environment map[string]string `json:"environment,omitempty" yaml:"environment,omitempty"`
 
 	ExitCode int64 `json:"exitCode,omitempty" yaml:"exit_code,omitempty"`
 
@@ -135,11 +135,11 @@ type Container struct {
 
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
-	Labels map[string]interface{} `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 
 	LogConfig *LogConfig `json:"logConfig,omitempty" yaml:"log_config,omitempty"`
 
-	LxcConf map[string]interface{} `json:"lxcConf,omitempty" yaml:"lxc_conf,omitempty"`
+	LxcConf map[string]string `json:"lxcConf,omitempty" yaml:"lxc_conf,omitempty"`
 
 	Memory int64 `json:"memory,omitempty" yaml:"memory,omitempty"`
 
@@ -219,13 +219,13 @@ type Container struct {
 
 	ShmSize int64 `json:"shmSize,omitempty" yaml:"shm_size,omitempty"`
 
+	ShouldRestart bool `json:"shouldRestart,omitempty" yaml:"should_restart,omitempty"`
+
 	SidekickTo string `json:"sidekickTo,omitempty" yaml:"sidekick_to,omitempty"`
 
 	StackId string `json:"stackId,omitempty" yaml:"stack_id,omitempty"`
 
 	StartCount int64 `json:"startCount,omitempty" yaml:"start_count,omitempty"`
-
-	StartOnCreate bool `json:"startOnCreate,omitempty" yaml:"start_on_create,omitempty"`
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 
@@ -233,13 +233,13 @@ type Container struct {
 
 	StopSignal string `json:"stopSignal,omitempty" yaml:"stop_signal,omitempty"`
 
-	StorageOpt map[string]interface{} `json:"storageOpt,omitempty" yaml:"storage_opt,omitempty"`
+	StopTimeout int64 `json:"stopTimeout,omitempty" yaml:"stop_timeout,omitempty"`
 
-	Sysctls map[string]interface{} `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
+	StorageOpt map[string]string `json:"storageOpt,omitempty" yaml:"storage_opt,omitempty"`
 
-	System bool `json:"system,omitempty" yaml:"system,omitempty"`
+	Sysctls map[string]string `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 
-	Tmpfs map[string]interface{} `json:"tmpfs,omitempty" yaml:"tmpfs,omitempty"`
+	Tmpfs map[string]string `json:"tmpfs,omitempty" yaml:"tmpfs,omitempty"`
 
 	Token string `json:"token,omitempty" yaml:"token,omitempty"`
 

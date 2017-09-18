@@ -34,16 +34,16 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -163,11 +163,11 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 
 	// Check if cpu quota is available.
 	// CPU cgroup is required and so it expected to be mounted at this point.
-	periodExists, err := utilfile.FileExists(path.Join(cpuMountPoint, "cpu.cfs_period_us"))
+	periodExists, err := util.FileExists(path.Join(cpuMountPoint, "cpu.cfs_period_us"))
 	if err != nil {
 		glog.Errorf("failed to detect if CPU cgroup cpu.cfs_period_us is available - %v", err)
 	}
-	quotaExists, err := utilfile.FileExists(path.Join(cpuMountPoint, "cpu.cfs_quota_us"))
+	quotaExists, err := util.FileExists(path.Join(cpuMountPoint, "cpu.cfs_quota_us"))
 	if err != nil {
 		glog.Errorf("failed to detect if CPU cgroup cpu.cfs_quota_us is available - %v", err)
 	}

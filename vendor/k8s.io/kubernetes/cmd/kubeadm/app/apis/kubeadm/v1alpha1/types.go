@@ -22,8 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -51,11 +49,6 @@ type MasterConfiguration struct {
 	APIServerCertSANs []string `json:"apiServerCertSANs"`
 	// CertificatesDir specifies where to store or look for all required certificates
 	CertificatesDir string `json:"certificatesDir"`
-
-	// ImageRepository what container registry to pull control plane images from
-	ImageRepository string `json:"imageRepository"`
-	// UnifiedControlPlaneImage specifies if a specific container image should be used for all control plane components
-	UnifiedControlPlaneImage string `json:"unifiedControlPlaneImage"`
 }
 
 type API struct {
@@ -84,11 +77,7 @@ type Etcd struct {
 	KeyFile   string            `json:"keyFile"`
 	DataDir   string            `json:"dataDir"`
 	ExtraArgs map[string]string `json:"extraArgs"`
-	// Image specifies which container image to use for running etcd. If empty, automatically populated by kubeadm using the image repository and default etcd version
-	Image string `json:"image"`
 }
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`

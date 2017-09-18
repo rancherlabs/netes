@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	icmd "github.com/docker/docker/pkg/integration/cmd"
+	"github.com/docker/docker/pkg/integration/checker"
 	"github.com/go-check/check"
 )
 
 const attachWait = 5 * time.Second
 
 func (s *DockerSuite) TestAttachMultipleAndRestart(c *check.C) {
+	testRequires(c, DaemonIsLinux)
+
 	endGroup := &sync.WaitGroup{}
 	startGroup := &sync.WaitGroup{}
 	endGroup.Add(3)
@@ -51,7 +52,6 @@ func (s *DockerSuite) TestAttachMultipleAndRestart(c *check.C) {
 			if err != nil {
 				c.Fatal(err)
 			}
-			defer out.Close()
 
 			if err := cmd.Start(); err != nil {
 				c.Fatal(err)
@@ -87,6 +87,7 @@ func (s *DockerSuite) TestAttachMultipleAndRestart(c *check.C) {
 }
 
 func (s *DockerSuite) TestAttachTTYWithoutStdin(c *check.C) {
+	testRequires(c, DaemonIsLinux)
 	out, _ := dockerCmd(c, "run", "-d", "-ti", "busybox")
 
 	id := strings.TrimSpace(out)
@@ -102,10 +103,7 @@ func (s *DockerSuite) TestAttachTTYWithoutStdin(c *check.C) {
 			return
 		}
 
-		expected := "the input device is not a TTY"
-		if runtime.GOOS == "windows" {
-			expected += ".  If you are using mintty, try prefixing the command with 'winpty'"
-		}
+		expected := "cannot enable tty mode"
 		if out, _, err := runCommandWithOutput(cmd); err == nil {
 			done <- fmt.Errorf("attach should have failed")
 			return
@@ -154,15 +152,11 @@ func (s *DockerSuite) TestAttachDisconnect(c *check.C) {
 }
 
 func (s *DockerSuite) TestAttachPausedContainer(c *check.C) {
-	testRequires(c, IsPausable)
+	testRequires(c, DaemonIsLinux) // Containers cannot be paused on Windows
 	defer unpauseAllContainers()
-	runSleepingContainer(c, "-d", "--name=test")
+	dockerCmd(c, "run", "-d", "--name=test", "busybox", "top")
 	dockerCmd(c, "pause", "test")
-
-	result := dockerCmdWithResult("attach", "test")
-	c.Assert(result, icmd.Matches, icmd.Expected{
-		Error:    "exit status 1",
-		ExitCode: 1,
-		Err:      "You cannot attach to a paused container, unpause it first",
-	})
+	out, _, err := dockerCmdWithError("attach", "test")
+	c.Assert(err, checker.NotNil, check.Commentf(out))
+	c.Assert(out, checker.Contains, "You cannot attach to a paused container, unpause it first")
 }

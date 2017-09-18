@@ -38,6 +38,7 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -45,12 +46,11 @@ const (
 	Timeout  = time.Minute * 5
 )
 
-// A Reaper terminates an object as gracefully as possible.
+// A Reaper handles terminating an object as gracefully as possible.
+// timeout is how long we'll wait for the termination to be successful
+// gracePeriod is time given to an API object for it to delete itself cleanly,
+// e.g., pod shutdown. It may or may not be supported by the API object.
 type Reaper interface {
-	// Stop a given object within a namespace. timeout is how long we'll
-	// wait for the termination to be successful. gracePeriod is time given
-	// to an API object for it to delete itself cleanly (e.g., pod
-	// shutdown). It may or may not be supported by the API object.
 	Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error
 }
 
@@ -80,6 +80,9 @@ func ReaperFor(kind schema.GroupKind, c internalclientset.Interface) (Reaper, er
 
 	case api.Kind("Pod"):
 		return &PodReaper{c.Core()}, nil
+
+	case api.Kind("Service"):
+		return &ServiceReaper{c.Core()}, nil
 
 	case batch.Kind("Job"):
 		return &JobReaper{c.Batch(), c.Core(), Interval, Timeout}, nil
@@ -123,10 +126,18 @@ type DeploymentReaper struct {
 type PodReaper struct {
 	client coreclient.PodsGetter
 }
+type ServiceReaper struct {
+	client coreclient.ServicesGetter
+}
 type StatefulSetReaper struct {
 	client                appsclient.StatefulSetsGetter
 	podClient             coreclient.PodsGetter
 	pollInterval, timeout time.Duration
+}
+
+type objInterface interface {
+	Delete(name string) error
+	Get(name string) (metav1.Object, error)
 }
 
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
@@ -325,8 +336,6 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	}
 	if timeout == 0 {
 		numReplicas := ss.Spec.Replicas
-
-		// BUG: this timeout is never used.
 		timeout = Timeout + time.Duration(10*numReplicas)*time.Second
 	}
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
@@ -394,8 +403,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
 		// set deployment's history and scale to 0
 		// TODO replace with patch when available: https://github.com/kubernetes/kubernetes/issues/20527
-		rhl := int32(0)
-		d.Spec.RevisionHistoryLimit = &rhl
+		d.Spec.RevisionHistoryLimit = util.Int32Ptr(0)
 		d.Spec.Replicas = 0
 		d.Spec.Paused = true
 	})
@@ -408,6 +416,13 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 		return deployments.Get(name, metav1.GetOptions{})
 	}, deployment.Generation, 1*time.Second, 1*time.Minute); err != nil {
 		return err
+	}
+
+	// Do not cascade deletion for overlapping deployments.
+	// A Deployment with this annotation will not create or manage anything,
+	// so we can assume any matching ReplicaSets belong to another Deployment.
+	if len(deployment.Annotations[deploymentutil.OverlapAnnotation]) > 0 {
+		return deployments.Delete(name, nil)
 	}
 
 	// Stop all replica sets belonging to this Deployment.
@@ -477,4 +492,15 @@ func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gra
 		return err
 	}
 	return pods.Delete(name, gracePeriod)
+}
+
+func (reaper *ServiceReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
+	services := reaper.client.Services(namespace)
+	_, err := services.Get(name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return services.Delete(name, deleteOptions)
 }

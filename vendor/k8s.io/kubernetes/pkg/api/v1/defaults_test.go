@@ -21,13 +21,12 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
@@ -712,7 +711,7 @@ func TestSetDefaultConfigMapVolumeSource(t *testing.T) {
 	expectedMode := v1.ConfigMapVolumeSourceDefaultMode
 
 	if defaultMode == nil || *defaultMode != expectedMode {
-		t.Errorf("Expected v1.ConfigMap DefaultMode %v, got %v", expectedMode, defaultMode)
+		t.Errorf("Expected ConfigMap DefaultMode %v, got %v", expectedMode, defaultMode)
 	}
 }
 
@@ -756,7 +755,7 @@ func TestSetDefaultProjectedVolumeSource(t *testing.T) {
 	expectedMode := v1.ProjectedVolumeSourceDefaultMode
 
 	if defaultMode == nil || *defaultMode != expectedMode {
-		t.Errorf("Expected v1.ProjectedVolumeSource DefaultMode %v, got %v", expectedMode, defaultMode)
+		t.Errorf("Expected ProjectedVolumeSource DefaultMode %v, got %v", expectedMode, defaultMode)
 	}
 }
 
@@ -1043,7 +1042,7 @@ func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
 		actual := node2.Status.Allocatable
 		expected := testcase.expectedAllocatable
 		if !resourceListsEqual(expected, actual) {
-			t.Errorf("[%d] Expected v1.NodeStatus.Allocatable: %+v; Got: %+v", i, expected, actual)
+			t.Errorf("[%d] Expected NodeStatus.Allocatable: %+v; Got: %+v", i, expected, actual)
 		}
 	}
 }
@@ -1105,7 +1104,7 @@ func TestSetMinimumScalePod(t *testing.T) {
 	pod := &v1.Pod{
 		Spec: s,
 	}
-	k8s_api_v1.SetObjectDefaults_Pod(pod)
+	v1.SetObjectDefaults_Pod(pod)
 
 	if expect := resource.MustParse("1m"); expect.Cmp(pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory]) != 0 {
 		t.Errorf("did not round resources: %#v", pod.Spec.Containers[0].Resources)

@@ -20,10 +20,10 @@ import (
 	"os"
 	"strconv"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	//"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
@@ -127,14 +127,14 @@ func defaultPredicates() sets.String {
 			},
 		),
 		// Fit is determined by whether or not there would be too many AWS EBS volumes attached to the node
-		//factory.RegisterFitPredicateFactory(
-		//	"MaxEBSVolumeCount",
-		//	func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-		//		// TODO: allow for generically parameterized scheduler predicates, because this is a bit ugly
-		//		maxVols := getMaxVols(aws.DefaultMaxEBSVolumes)
-		//		return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilter, maxVols, args.PVInfo, args.PVCInfo)
-		//	},
-		//),
+		factory.RegisterFitPredicateFactory(
+			"MaxEBSVolumeCount",
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				// TODO: allow for generically parameterized scheduler predicates, because this is a bit ugly
+				maxVols := getMaxVols(aws.DefaultMaxEBSVolumes)
+				return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilter, maxVols, args.PVInfo, args.PVCInfo)
+			},
+		),
 		// Fit is determined by whether or not there would be too many GCE PD volumes attached to the node
 		factory.RegisterFitPredicateFactory(
 			"MaxGCEPDVolumeCount",

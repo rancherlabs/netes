@@ -579,7 +579,7 @@ func (g openAPITypeWriter) generateMapProperty(t *types.Type) error {
 	case types.Builtin:
 		return fmt.Errorf("please add type %v to getOpenAPITypeFormat function.", elemType)
 	case types.Struct:
-		g.generateReferenceProperty(elemType)
+		g.generateReferenceProperty(t.Elem)
 	case types.Slice, types.Array:
 		g.generateSliceProperty(elemType)
 	default:
@@ -603,7 +603,7 @@ func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 	case types.Builtin:
 		return fmt.Errorf("please add type %v to getOpenAPITypeFormat function.", elemType)
 	case types.Struct:
-		g.generateReferenceProperty(elemType)
+		g.generateReferenceProperty(t.Elem)
 	default:
 		return fmt.Errorf("slice Element kind %v is not supported in %v", elemType.Kind, t)
 	}

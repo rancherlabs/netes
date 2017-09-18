@@ -2,7 +2,6 @@ package main
 
 import (
 	"strings"
-	"time"
 
 	"github.com/docker/docker/pkg/integration/checker"
 	"github.com/go-check/check"
@@ -10,27 +9,16 @@ import (
 
 // ensure that an added file shows up in docker diff
 func (s *DockerSuite) TestDiffFilenameShownInOutput(c *check.C) {
-	containerCmd := `mkdir /foo; echo xyzzy > /foo/bar`
+	testRequires(c, DaemonIsLinux)
+	containerCmd := `echo foo > /root/bar`
 	out, _ := dockerCmd(c, "run", "-d", "busybox", "sh", "-c", containerCmd)
-
-	// Wait for it to exit as cannot diff a running container on Windows, and
-	// it will take a few seconds to exit. Also there's no way in Windows to
-	// differentiate between an Add or a Modify, and all files are under
-	// a "Files/" prefix.
-	containerID := strings.TrimSpace(out)
-	lookingFor := "A /foo/bar"
-	if daemonPlatform == "windows" {
-		err := waitExited(containerID, 60*time.Second)
-		c.Assert(err, check.IsNil)
-		lookingFor = "C Files/foo/bar"
-	}
 
 	cleanCID := strings.TrimSpace(out)
 	out, _ = dockerCmd(c, "diff", cleanCID)
 
 	found := false
 	for _, line := range strings.Split(out, "\n") {
-		if strings.Contains(line, lookingFor) {
+		if strings.Contains("A /root/bar", line) {
 			found = true
 			break
 		}
@@ -59,7 +47,7 @@ func (s *DockerSuite) TestDiffEnsureInitLayerFilesAreIgnored(c *check.C) {
 	}
 }
 
-func (s *DockerSuite) TestDiffEnsureDefaultDevs(c *check.C) {
+func (s *DockerSuite) TestDiffEnsureOnlyKmsgAndPtmx(c *check.C) {
 	testRequires(c, DaemonIsLinux)
 	out, _ := dockerCmd(c, "run", "-d", "busybox", "sleep", "0")
 
@@ -73,6 +61,7 @@ func (s *DockerSuite) TestDiffEnsureDefaultDevs(c *check.C) {
 		"A /dev/mqueue":  true,
 		"A /dev/kmsg":    true,
 		"A /dev/fd":      true,
+		"A /dev/fuse":    true,
 		"A /dev/ptmx":    true,
 		"A /dev/null":    true,
 		"A /dev/random":  true,
@@ -86,7 +75,7 @@ func (s *DockerSuite) TestDiffEnsureDefaultDevs(c *check.C) {
 	}
 
 	for _, line := range strings.Split(out, "\n") {
-		c.Assert(line == "" || expected[line], checker.True, check.Commentf(line))
+		c.Assert(line == "" || expected[line], checker.True)
 	}
 }
 
@@ -94,5 +83,5 @@ func (s *DockerSuite) TestDiffEnsureDefaultDevs(c *check.C) {
 func (s *DockerSuite) TestDiffEmptyArgClientError(c *check.C) {
 	out, _, err := dockerCmdWithError("diff", "")
 	c.Assert(err, checker.NotNil)
-	c.Assert(strings.TrimSpace(out), checker.Contains, "Container name cannot be empty")
+	c.Assert(strings.TrimSpace(out), checker.Equals, "Container name cannot be empty")
 }

@@ -21,12 +21,12 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/v1"
 
 	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -97,7 +97,8 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		return
 	}
 
-	newUnstr, err := unstructured.DefaultConverter.ToUnstructured(item)
+	newUnstr := make(map[string]interface{})
+	err = unstructured.DefaultConverter.ToUnstructured(item, &newUnstr)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
@@ -137,8 +138,8 @@ func BenchmarkToFromUnstructured(b *testing.B) {
 	size := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		unstr, err := unstructured.DefaultConverter.ToUnstructured(&items[i%size])
-		if err != nil {
+		unstr := map[string]interface{}{}
+		if err := unstructured.DefaultConverter.ToUnstructured(&items[i%size], &unstr); err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 		obj := v1.Pod{}

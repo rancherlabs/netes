@@ -1,33 +1,24 @@
----
-title: "network connect"
-description: "The network connect command description and usage"
-keywords: "network, connect, user-defined"
----
-
-<!-- This file is maintained within the docker/docker Github
-     repository at https://github.com/docker/docker/. Make all
-     pull requests against that repo. If you see this file in
-     another repository, consider it read-only there, as it will
-     periodically be overwritten by the definitive file. Pull
-     requests which include edits to this file in other repositories
-     will be rejected.
--->
+<!--[metadata]>
++++
+title = "network connect"
+description = "The network connect command description and usage"
+keywords = ["network, connect, user-defined"]
+[menu.main]
+parent = "smn_cli"
++++
+<![end-metadata]-->
 
 # network connect
 
-```markdown
-Usage:  docker network connect [OPTIONS] NETWORK CONTAINER
+    Usage:  docker network connect [OPTIONS] NETWORK CONTAINER
 
-Connect a container to a network
+    Connects a container to a network
 
-Options:
-      --alias value           Add network-scoped alias for the container (default [])
-      --help                  Print usage
-      --ip string             IP Address
-      --ip6 string            IPv6 Address
-      --link value            Add link to another container (default [])
-      --link-local-ip value   Add a link-local address for the container (default [])
-```
+      --alias=[]         Add network-scoped alias for the container
+      --help             Print usage
+      --ip               IPv4 Address
+      --ip6              IPv6 Address
+      --link=[]          Add a link to another container
 
 Connects a container to a network. You can connect a container by name
 or by ID. Once connected, the container can communicate with other containers in
@@ -37,10 +28,10 @@ the same network.
 $ docker network connect multi-host-network container1
 ```
 
-You can also use the `docker run --network=<network-name>` option to start a container and immediately connect it to a network.
+You can also use the `docker run --net=<network-name>` option to start a container and immediately connect it to a network.
 
 ```bash
-$ docker run -itd --network=multi-host-network busybox
+$ docker run -itd --net=multi-host-network busybox
 ```
 
 You can specify the IP address you want to be assigned to the container's interface.
@@ -61,8 +52,11 @@ being connected to.
 ```bash
 $ docker network connect --alias db --alias mysql multi-host-network container2
 ```
+
 You can pause, restart, and stop containers that are connected to a network.
-A container connects to its configured networks when it runs.
+Paused containers remain connected and can be revealed by a `network inspect`.
+When the container is stopped, it does not appear on the network until you restart
+it.
 
 If specified, the container's IP address(es) is reapplied when a stopped
 container is restarted. If the IP address is no longer available, the container
@@ -95,6 +89,5 @@ You can connect a container to one or more networks. The networks need not be th
 * [network disconnect](network_disconnect.md)
 * [network ls](network_ls.md)
 * [network rm](network_rm.md)
-* [network prune](network_prune.md)
-* [Understand Docker container networks](https://docs.docker.com/engine/userguide/networking/)
-* [Work with networks](https://docs.docker.com/engine/userguide/networking/work-with-networks/)
+* [Understand Docker container networks](../../userguide/networking/dockernetworks.md)
+* [Work with networks](../../userguide/networking/work-with-networks.md)

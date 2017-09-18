@@ -5,46 +5,41 @@ import (
 	"net/http"
 	"runtime"
 
-	"github.com/docker/docker/api/errors"
-	"github.com/docker/docker/api/types/versions"
+	"github.com/docker/docker/api/server/httputils"
+	"github.com/docker/docker/pkg/version"
 	"golang.org/x/net/context"
 )
 
-// VersionMiddleware is a middleware that
-// validates the client and server versions.
-type VersionMiddleware struct {
-	serverVersion  string
-	defaultVersion string
-	minVersion     string
+type badRequestError struct {
+	error
 }
 
-// NewVersionMiddleware creates a new VersionMiddleware
-// with the default versions.
-func NewVersionMiddleware(s, d, m string) VersionMiddleware {
-	return VersionMiddleware{
-		serverVersion:  s,
-		defaultVersion: d,
-		minVersion:     m,
-	}
+func (badRequestError) HTTPErrorStatusCode() int {
+	return http.StatusBadRequest
 }
 
-// WrapHandler returns a new handler function wrapping the previous one in the request chain.
-func (v VersionMiddleware) WrapHandler(handler func(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error) func(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-		apiVersion := vars["version"]
-		if apiVersion == "" {
-			apiVersion = v.defaultVersion
-		}
+// NewVersionMiddleware creates a new Version middleware.
+func NewVersionMiddleware(versionCheck string, defaultVersion, minVersion version.Version) Middleware {
+	serverVersion := version.Version(versionCheck)
 
-		if versions.LessThan(apiVersion, v.minVersion) {
-			return errors.NewBadRequestError(fmt.Errorf("client version %s is too old. Minimum supported API version is %s, please upgrade your client to a newer version", apiVersion, v.minVersion))
-		}
+	return func(handler httputils.APIFunc) httputils.APIFunc {
+		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+			apiVersion := version.Version(vars["version"])
+			if apiVersion == "" {
+				apiVersion = defaultVersion
+			}
 
-		header := fmt.Sprintf("Docker/%s (%s)", v.serverVersion, runtime.GOOS)
-		w.Header().Set("Server", header)
-		w.Header().Set("API-Version", v.defaultVersion)
-		ctx = context.WithValue(ctx, "api-version", apiVersion)
-		return handler(ctx, w, r, vars)
+			if apiVersion.GreaterThan(defaultVersion) {
+				return badRequestError{fmt.Errorf("client is newer than server (client API version: %s, server API version: %s)", apiVersion, defaultVersion)}
+			}
+			if apiVersion.LessThan(minVersion) {
+				return badRequestError{fmt.Errorf("client version %s is too old. Minimum supported API version is %s, please upgrade your client to a newer version", apiVersion, minVersion)}
+			}
+
+			header := fmt.Sprintf("Docker/%s (%s)", serverVersion, runtime.GOOS)
+			w.Header().Set("Server", header)
+			ctx = context.WithValue(ctx, httputils.APIVersionKey, apiVersion)
+			return handler(ctx, w, r, vars)
+		}
 	}
-
 }

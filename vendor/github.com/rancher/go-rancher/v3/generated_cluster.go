@@ -9,8 +9,6 @@ type Cluster struct {
 
 	Created string `json:"created,omitempty" yaml:"created,omitempty"`
 
-	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
-
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 
 	Embedded bool `json:"embedded,omitempty" yaml:"embedded,omitempty"`
@@ -19,17 +17,25 @@ type Cluster struct {
 
 	Identity ClusterIdentity `json:"identity,omitempty" yaml:"identity,omitempty"`
 
-	K8sConfig K8sConfig `json:"k8sConfig,omitempty" yaml:"k8s_config,omitempty"`
+	K8sClientConfig *K8sClientConfig `json:"k8sClientConfig,omitempty" yaml:"k8s_client_config,omitempty"`
+
+	K8sServerConfig *K8sServerConfig `json:"k8sServerConfig,omitempty" yaml:"k8s_server_config,omitempty"`
 
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+
+	Orchestration string `json:"orchestration,omitempty" yaml:"orchestration,omitempty"`
+
+	RegistrationToken *RegistrationToken `json:"registrationToken,omitempty" yaml:"registration_token,omitempty"`
 
 	RemoveTime string `json:"removeTime,omitempty" yaml:"remove_time,omitempty"`
 
 	Removed string `json:"removed,omitempty" yaml:"removed,omitempty"`
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
+
+	SystemStacks []Stack `json:"systemStacks,omitempty" yaml:"system_stacks,omitempty"`
 
 	Transitioning string `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 
@@ -55,11 +61,15 @@ type ClusterOperations interface {
 	ById(id string) (*Cluster, error)
 	Delete(container *Cluster) error
 
+	ActionActivate(*Cluster) (*Cluster, error)
+
 	ActionCreate(*Cluster) (*Cluster, error)
 
 	ActionError(*Cluster) (*Cluster, error)
 
 	ActionRemove(*Cluster) (*Cluster, error)
+
+	ActionUpdate(*Cluster) (*Cluster, error)
 }
 
 func newClusterClient(rancherClient *RancherClient) *ClusterClient {
@@ -112,6 +122,15 @@ func (c *ClusterClient) Delete(container *Cluster) error {
 	return c.rancherClient.doResourceDelete(CLUSTER_TYPE, &container.Resource)
 }
 
+func (c *ClusterClient) ActionActivate(resource *Cluster) (*Cluster, error) {
+
+	resp := &Cluster{}
+
+	err := c.rancherClient.doAction(CLUSTER_TYPE, "activate", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
 func (c *ClusterClient) ActionCreate(resource *Cluster) (*Cluster, error) {
 
 	resp := &Cluster{}
@@ -135,6 +154,15 @@ func (c *ClusterClient) ActionRemove(resource *Cluster) (*Cluster, error) {
 	resp := &Cluster{}
 
 	err := c.rancherClient.doAction(CLUSTER_TYPE, "remove", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
+func (c *ClusterClient) ActionUpdate(resource *Cluster) (*Cluster, error) {
+
+	resp := &Cluster{}
+
+	err := c.rancherClient.doAction(CLUSTER_TYPE, "update", &resource.Resource, nil, resp)
 
 	return resp, err
 }

@@ -2,21 +2,22 @@ package daemon
 
 import (
 	"os"
-	"path/filepath"
 
-	"github.com/docker/docker/api/types"
-	"github.com/spf13/pflag"
+	flag "github.com/docker/docker/pkg/mflag"
 )
 
 var (
-	defaultPidFile string
-	defaultGraph   = filepath.Join(os.Getenv("programdata"), "docker")
+	defaultPidFile  = os.Getenv("programdata") + string(os.PathSeparator) + "docker.pid"
+	defaultGraph    = os.Getenv("programdata") + string(os.PathSeparator) + "docker"
+	defaultExecRoot = defaultGraph
 )
 
 // bridgeConfig stores all the bridge driver specific
 // configuration.
 type bridgeConfig struct {
-	commonBridgeConfig
+	FixedCIDR   string
+	NetworkMode string
+	Iface       string `json:"bridge,omitempty"`
 }
 
 // Config defines the configuration of a docker daemon.
@@ -29,43 +30,16 @@ type Config struct {
 	// for the Windows daemon.)
 }
 
-// InstallFlags adds flags to the pflag.FlagSet to configure the daemon
-func (config *Config) InstallFlags(flags *pflag.FlagSet) {
+// InstallFlags adds command-line options to the top-level flag parser for
+// the current process.
+// Subsequent calls to `flag.Parse` will populate config with values parsed
+// from the command-line.
+func (config *Config) InstallFlags(cmd *flag.FlagSet, usageFn func(string) string) {
 	// First handle install flags which are consistent cross-platform
-	config.InstallCommonFlags(flags)
+	config.InstallCommonFlags(cmd, usageFn)
 
 	// Then platform-specific install flags.
-	flags.StringVar(&config.bridgeConfig.FixedCIDR, "fixed-cidr", "", "IPv4 subnet for fixed IPs")
-	flags.StringVarP(&config.bridgeConfig.Iface, "bridge", "b", "", "Attach containers to a virtual switch")
-	flags.StringVarP(&config.SocketGroup, "group", "G", "", "Users or groups that can access the named pipe")
-}
-
-// GetRuntime returns the runtime path and arguments for a given
-// runtime name
-func (config *Config) GetRuntime(name string) *types.Runtime {
-	return nil
-}
-
-// GetInitPath returns the configure docker-init path
-func (config *Config) GetInitPath() string {
-	return ""
-}
-
-// GetDefaultRuntimeName returns the current default runtime
-func (config *Config) GetDefaultRuntimeName() string {
-	return stockRuntimeName
-}
-
-// GetAllRuntimes returns a copy of the runtimes map
-func (config *Config) GetAllRuntimes() map[string]types.Runtime {
-	return map[string]types.Runtime{}
-}
-
-// GetExecRoot returns the user configured Exec-root
-func (config *Config) GetExecRoot() string {
-	return ""
-}
-
-func (config *Config) isSwarmCompatible() error {
-	return nil
+	cmd.StringVar(&config.bridgeConfig.FixedCIDR, []string{"-fixed-cidr"}, "", usageFn("IPv4 subnet for fixed IPs"))
+	cmd.StringVar(&config.bridgeConfig.Iface, []string{"b", "-bridge"}, "", "Attach containers to a virtual switch")
+	cmd.StringVar(&config.SocketGroup, []string{"G", "-group"}, "", usageFn("Users or groups that can access the named pipe"))
 }

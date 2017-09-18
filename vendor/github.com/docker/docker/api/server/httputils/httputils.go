@@ -1,6 +1,7 @@
 package httputils
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/docker/docker/api"
+	"github.com/docker/docker/pkg/version"
 )
 
 // APIVersionKey is the client's requested API version.
@@ -18,7 +20,7 @@ const APIVersionKey = "api-version"
 const UAStringKey = "upstream-user-agent"
 
 // APIFunc is an adapter to allow the use of ordinary functions as Docker API endpoints.
-// Any function that has the appropriate signature can be registered as an API endpoint (e.g. getVersion).
+// Any function that has the appropriate signature can be registered as a API endpoint (e.g. getVersion).
 type APIFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error
 
 // HijackConnection interrupts the http response writer to get the
@@ -76,9 +78,24 @@ func ParseForm(r *http.Request) error {
 	return nil
 }
 
+// ParseMultipartForm ensures the request form is parsed, even with invalid content types.
+func ParseMultipartForm(r *http.Request) error {
+	if err := r.ParseMultipartForm(4096); err != nil && !strings.HasPrefix(err.Error(), "mime:") {
+		return err
+	}
+	return nil
+}
+
+// WriteJSON writes the value v to the http response stream as json with standard json encoding.
+func WriteJSON(w http.ResponseWriter, code int, v interface{}) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	return json.NewEncoder(w).Encode(v)
+}
+
 // VersionFromContext returns an API version from the context using APIVersionKey.
 // It panics if the context value does not have version.Version type.
-func VersionFromContext(ctx context.Context) (ver string) {
+func VersionFromContext(ctx context.Context) (ver version.Version) {
 	if ctx == nil {
 		return
 	}
@@ -86,5 +103,5 @@ func VersionFromContext(ctx context.Context) (ver string) {
 	if val == nil {
 		return
 	}
-	return val.(string)
+	return val.(version.Version)
 }

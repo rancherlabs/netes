@@ -9,9 +9,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/server/httputils"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/versions"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/docker/engine-api/types"
 	"golang.org/x/net/context"
 )
 
@@ -37,19 +36,20 @@ func (s *containerRouter) postContainerExecCreate(ctx context.Context, w http.Re
 	if err := json.NewDecoder(r.Body).Decode(execConfig); err != nil {
 		return err
 	}
+	execConfig.Container = name
 
 	if len(execConfig.Cmd) == 0 {
 		return fmt.Errorf("No exec command specified")
 	}
 
 	// Register an instance of Exec in container.
-	id, err := s.backend.ContainerExecCreate(name, execConfig)
+	id, err := s.backend.ContainerExecCreate(execConfig)
 	if err != nil {
 		logrus.Errorf("Error setting up exec command in container %s: %v", name, err)
 		return err
 	}
 
-	return httputils.WriteJSON(w, http.StatusCreated, &types.IDResponse{
+	return httputils.WriteJSON(w, http.StatusCreated, &types.ContainerExecCreateResponse{
 		ID: id,
 	})
 }
@@ -61,7 +61,7 @@ func (s *containerRouter) postContainerExecStart(ctx context.Context, w http.Res
 	}
 
 	version := httputils.VersionFromContext(ctx)
-	if versions.GreaterThan(version, "1.21") {
+	if version.GreaterThan("1.21") {
 		if err := httputils.CheckForJSON(r); err != nil {
 			return err
 		}
@@ -92,16 +92,10 @@ func (s *containerRouter) postContainerExecStart(ctx context.Context, w http.Res
 		defer httputils.CloseStreams(inStream, outStream)
 
 		if _, ok := r.Header["Upgrade"]; ok {
-			fmt.Fprint(outStream, "HTTP/1.1 101 UPGRADED\r\nContent-Type: application/vnd.docker.raw-stream\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n")
+			fmt.Fprintf(outStream, "HTTP/1.1 101 UPGRADED\r\nContent-Type: application/vnd.docker.raw-stream\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
 		} else {
-			fmt.Fprint(outStream, "HTTP/1.1 200 OK\r\nContent-Type: application/vnd.docker.raw-stream\r\n")
+			fmt.Fprintf(outStream, "HTTP/1.1 200 OK\r\nContent-Type: application/vnd.docker.raw-stream\r\n\r\n")
 		}
-
-		// copy headers that were removed as part of hijack
-		if err := w.Header().WriteSubset(outStream, nil); err != nil {
-			return err
-		}
-		fmt.Fprint(outStream, "\r\n")
 
 		stdin = inStream
 		stdout = outStream
@@ -112,13 +106,13 @@ func (s *containerRouter) postContainerExecStart(ctx context.Context, w http.Res
 	}
 
 	// Now run the user process in container.
-	// Maybe we should we pass ctx here if we're not detaching?
-	if err := s.backend.ContainerExecStart(context.Background(), execName, stdin, stdout, stderr); err != nil {
+	if err := s.backend.ContainerExecStart(execName, stdin, stdout, stderr); err != nil {
 		if execStartCheck.Detach {
 			return err
 		}
-		stdout.Write([]byte(err.Error() + "\r\n"))
-		logrus.Errorf("Error running exec in container: %v", err)
+		stdout.Write([]byte(err.Error()))
+		logrus.Errorf("Error running exec in container: %v\n", err)
+		return err
 	}
 	return nil
 }

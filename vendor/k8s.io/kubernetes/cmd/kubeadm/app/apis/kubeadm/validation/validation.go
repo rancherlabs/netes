@@ -44,6 +44,7 @@ var cloudproviders = []string{
 	"azure",
 	"cloudstack",
 	"gce",
+	"mesos",
 	"openstack",
 	"ovirt",
 	"photon",
@@ -51,16 +52,10 @@ var cloudproviders = []string{
 	"vsphere",
 }
 
-// Describes the authorization modes that are enforced by kubeadm
-var requiredAuthzModes = []string{
-	authzmodes.ModeRBAC,
-	authzmodes.ModeNode,
-}
-
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudprovider"))...)
-	allErrs = append(allErrs, ValidateAuthorizationModes(c.AuthorizationModes, field.NewPath("authorization-modes"))...)
+	allErrs = append(allErrs, ValidateAuthorizationModes(c.AuthorizationModes, field.NewPath("authorization-mode"))...)
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateAPIServerCertSANs(c.APIServerCertSANs, field.NewPath("cert-altnames"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificates-dir"))...)
@@ -81,23 +76,19 @@ func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 
 func ValidateAuthorizationModes(authzModes []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	found := map[string]bool{}
-
 	for _, authzMode := range authzModes {
 		if !authzmodes.IsValidAuthorizationMode(authzMode) {
 			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "invalid authorization mode"))
 		}
+	}
 
+	found := map[string]bool{}
+	for _, authzMode := range authzModes {
 		if found[authzMode] {
 			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "duplicate authorization mode"))
 			continue
 		}
 		found[authzMode] = true
-	}
-	for _, requiredMode := range requiredAuthzModes {
-		if !found[requiredMode] {
-			allErrs = append(allErrs, field.Required(fldPath, fmt.Sprintf("authorization mode %s must be enabled", requiredMode)))
-		}
 	}
 	return allErrs
 }
@@ -242,7 +233,7 @@ func ValidateAbsolutePath(path string, fldPath *field.Path) field.ErrorList {
 func ValidateNodeName(nodename string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if node.GetHostname(nodename) != nodename {
-		allErrs = append(allErrs, field.Invalid(fldPath, nodename, "nodename is not valid, must be lower case"))
+		allErrs = append(allErrs, field.Invalid(fldPath, nodename, "nodename is not valid"))
 	}
 	return allErrs
 }
@@ -262,8 +253,22 @@ func ValidateCloudProvider(provider string, fldPath *field.Path) field.ErrorList
 }
 
 func ValidateMixedArguments(flag *pflag.FlagSet) error {
-	if flag.Changed("config") && flag.NFlag() != 1 {
-		return fmt.Errorf("can not mix '--config' with other arguments")
+	// If --config isn't set, we have nothing to validate
+	if !flag.Changed("config") {
+		return nil
+	}
+
+	mixedInvalidFlags := []string{}
+	flag.Visit(func(f *pflag.Flag) {
+		if f.Name == "config" || strings.HasPrefix(f.Name, "skip-") {
+			// "--skip-*" flags can be set with --config
+			return
+		}
+		mixedInvalidFlags = append(mixedInvalidFlags, f.Name)
+	})
+
+	if len(mixedInvalidFlags) != 0 {
+		return fmt.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
 	}
 	return nil
 }

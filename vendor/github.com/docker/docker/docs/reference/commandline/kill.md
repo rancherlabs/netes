@@ -1,29 +1,21 @@
----
-title: "kill"
-description: "The kill command description and usage"
-keywords: "container, kill, signal"
----
-
-<!-- This file is maintained within the docker/docker Github
-     repository at https://github.com/docker/docker/. Make all
-     pull requests against that repo. If you see this file in
-     another repository, consider it read-only there, as it will
-     periodically be overwritten by the definitive file. Pull
-     requests which include edits to this file in other repositories
-     will be rejected.
--->
+<!--[metadata]>
++++
+title = "kill"
+description = "The kill command description and usage"
+keywords = ["container, kill, signal"]
+[menu.main]
+parent = "smn_cli"
++++
+<![end-metadata]-->
 
 # kill
 
-```markdown
-Usage:  docker kill [OPTIONS] CONTAINER [CONTAINER...]
+    Usage: docker kill [OPTIONS] CONTAINER [CONTAINER...]
 
-Kill one or more running containers
+    Kill a running container using SIGKILL or a specified signal
 
-Options:
-      --help            Print usage
-  -s, --signal string   Signal to send to the container (default "KILL")
-```
+      --help                 Print usage
+      -s, --signal="KILL"    Signal to send to the container
 
 The main process inside the container will be sent `SIGKILL`, or any
 signal specified with option `--signal`.

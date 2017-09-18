@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -96,7 +97,7 @@ func CreateConfigMap(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 			EnvFileSource:  cmdutil.GetFlagString(cmd, "from-env-file"),
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

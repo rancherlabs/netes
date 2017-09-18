@@ -665,9 +665,7 @@ ENABLE_DEFAULT_STORAGE_CLASS: $(yaml-quote ${ENABLE_DEFAULT_STORAGE_CLASS:-})
 ENABLE_APISERVER_BASIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_BASIC_AUDIT:-})
 ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote ${ENABLE_APISERVER_ADVANCED_AUDIT:-})
 ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-false})
-ENABLE_PATCH_CONVERSION_DETECTOR: $(yaml-quote ${ENABLE_PATCH_CONVERSION_DETECTOR:-false})
 ADVANCED_AUDIT_BACKEND: $(yaml-quote ${ADVANCED_AUDIT_BACKEND:-log})
-GCE_API_ENDPOINT: $(yaml-quote ${GCE_API_ENDPOINT:-})
 EOF
   if [ -n "${KUBELET_PORT:-}" ]; then
     cat >>$file <<EOF
@@ -744,12 +742,6 @@ EOF
   if [ -n "${FEATURE_GATES:-}" ]; then
     cat >>$file <<EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
-EOF
-  fi
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] ||
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
-    cat >>$file <<EOF
-VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR:-/home/kubernetes/flexvolume})
 EOF
   fi
 

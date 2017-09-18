@@ -9,11 +9,9 @@ load(
 
 go_test(
     name = "go_default_test",
-    size = "large",
     srcs = [
         "accessreview_test.go",
         "auth_test.go",
-        "main_test.go",
         "node_test.go",
         "rbac_test.go",
     ],
@@ -24,6 +22,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/apis/authentication/v1beta1:go_default_library",
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/extensions:go_default_library",
@@ -49,7 +48,6 @@ go_test(
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/authentication/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -59,11 +57,11 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/authentication/group:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/request/bearertoken:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/token/tokenfile:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
+        "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",

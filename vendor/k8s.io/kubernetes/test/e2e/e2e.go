@@ -32,23 +32,30 @@ import (
 	"github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
-	clientset "k8s.io/client-go/kubernetes"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/logs"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
-	"k8s.io/kubernetes/test/e2e/manifest"
-	"k8s.io/kubernetes/test/e2e/metrics"
+	"k8s.io/kubernetes/test/e2e/generated"
 	federationtest "k8s.io/kubernetes/test/e2e_federation"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
-	// TODO: Delete this once all the tests that depend upon it are moved out of test/e2e and into subdirs
-	podName = "pfpod"
+	// imagePrePullingTimeout is the time we wait for the e2e-image-puller
+	// static pods to pull the list of seeded images. If they don't pull
+	// images within this time we simply log their output and carry on
+	// with the tests.
+	imagePrePullingTimeout = 5 * time.Minute
 )
 
 var (
@@ -73,8 +80,7 @@ func setupProviderConfig() error {
 		if !framework.TestContext.CloudConfig.MultiZone {
 			managedZones = []string{zone}
 		}
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ApiEndpoint,
-			framework.TestContext.CloudConfig.ProjectID,
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID,
 			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
 			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
@@ -166,12 +172,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
-	if err := framework.WaitForPodsSuccess(c, metav1.NamespaceSystem, framework.ImagePullerLabels, framework.ImagePrePullingTimeout); err != nil {
+	if err := framework.WaitForPodsSuccess(c, metav1.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingTimeout); err != nil {
 		// There is no guarantee that the image pulling will succeed in 3 minutes
 		// and we don't even run the image puller on all platforms (including GKE).
 		// We wait for it so we get an indication of failures in the logs, and to
 		// maximize benefit of image pre-pulling.
-		framework.Logf("WARNING: Image pulling pods failed to enter success in %v: %v", framework.ImagePrePullingTimeout, err)
+		framework.Logf("WARNING: Image pulling pods failed to enter success in %v: %v", imagePrePullingTimeout, err)
 	}
 
 	// Dump the output of the nethealth containers only once per run
@@ -340,12 +346,25 @@ func RunE2ETests(t *testing.T) {
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
 
+func podFromManifest(filename string) (*v1.Pod, error) {
+	var pod v1.Pod
+	framework.Logf("Parsing pod from %v", filename)
+	data := generated.ReadOrDie(filename)
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &pod); err != nil {
+		return nil, err
+	}
+	return &pod, nil
+}
+
 // Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
 // to flip to Ready, log its output and delete it.
 func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 	path := "test/images/clusterapi-tester/pod.yaml"
-	framework.Logf("Parsing pod from %v", path)
-	p, err := manifest.PodFromManifest(path)
+	p, err := podFromManifest(path)
 	if err != nil {
 		framework.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
 		return

@@ -90,12 +90,8 @@ func (l *JSONFileLogger) Log(msg *logger.Message) error {
 		return err
 	}
 	l.mu.Lock()
-	logline := msg.Line
-	if !msg.Partial {
-		logline = append(msg.Line, '\n')
-	}
 	err = (&jsonlog.JSONLogs{
-		Log:      logline,
+		Log:      append(msg.Line, '\n'),
 		Stream:   msg.Source,
 		Created:  timestamp,
 		RawAttrs: l.extra,

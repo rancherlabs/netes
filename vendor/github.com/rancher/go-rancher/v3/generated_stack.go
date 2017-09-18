@@ -15,8 +15,6 @@ type Stack struct {
 
 	Created string `json:"created,omitempty" yaml:"created,omitempty"`
 
-	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
-
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 
 	ExternalId string `json:"externalId,omitempty" yaml:"external_id,omitempty"`
@@ -27,13 +25,15 @@ type Stack struct {
 
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
-	Labels map[string]interface{} `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 
-	Outputs map[string]interface{} `json:"outputs,omitempty" yaml:"outputs,omitempty"`
+	Outputs map[string]string `json:"outputs,omitempty" yaml:"outputs,omitempty"`
 
 	ParentStackId string `json:"parentStackId,omitempty" yaml:"parent_stack_id,omitempty"`
+
+	Prune bool `json:"prune,omitempty" yaml:"prune,omitempty"`
 
 	RemoveTime string `json:"removeTime,omitempty" yaml:"remove_time,omitempty"`
 
@@ -41,13 +41,9 @@ type Stack struct {
 
 	ServiceIds []string `json:"serviceIds,omitempty" yaml:"service_ids,omitempty"`
 
-	StartOnCreate bool `json:"startOnCreate,omitempty" yaml:"start_on_create,omitempty"`
-
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 
-	System bool `json:"system,omitempty" yaml:"system,omitempty"`
-
-	Templates map[string]interface{} `json:"templates,omitempty" yaml:"templates,omitempty"`
+	Templates map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
 
 	Transitioning string `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 

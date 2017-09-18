@@ -6,8 +6,8 @@ package journald
 
 import (
 	"fmt"
+	"strings"
 	"sync"
-	"unicode"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/coreos/go-systemd/journal"
@@ -36,26 +36,6 @@ func init() {
 	}
 }
 
-// sanitizeKeyMode returns the sanitized string so that it could be used in journald.
-// In journald log, there are special requirements for fields.
-// Fields must be composed of uppercase letters, numbers, and underscores, but must
-// not start with an underscore.
-func sanitizeKeyMod(s string) string {
-	n := ""
-	for _, v := range s {
-		if 'a' <= v && v <= 'z' {
-			v = unicode.ToUpper(v)
-		} else if ('Z' < v || v < 'A') && ('9' < v || v < '0') {
-			v = '_'
-		}
-		// If (n == "" && v == '_'), then we will skip as this is the beginning with '_'
-		if !(n == "" && v == '_') {
-			n += string(v)
-		}
-	}
-	return n
-}
-
 // New creates a journald logger using the configuration passed in on
 // the context.
 func New(ctx logger.Context) (logger.Logger, error) {
@@ -70,7 +50,7 @@ func New(ctx logger.Context) (logger.Logger, error) {
 	}
 
 	// parse log tag
-	tag, err := loggerutils.ParseLogTag(ctx, loggerutils.DefaultTemplate)
+	tag, err := loggerutils.ParseLogTag(ctx, "")
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +61,7 @@ func New(ctx logger.Context) (logger.Logger, error) {
 		"CONTAINER_NAME":    name,
 		"CONTAINER_TAG":     tag,
 	}
-	extraAttrs := ctx.ExtraAttributes(sanitizeKeyMod)
+	extraAttrs := ctx.ExtraAttributes(strings.ToTitle)
 	for k, v := range extraAttrs {
 		vars[k] = v
 	}
@@ -104,17 +84,10 @@ func validateLogOpt(cfg map[string]string) error {
 }
 
 func (s *journald) Log(msg *logger.Message) error {
-	vars := map[string]string{}
-	for k, v := range s.vars {
-		vars[k] = v
-	}
-	if msg.Partial {
-		vars["CONTAINER_PARTIAL_MESSAGE"] = "true"
-	}
 	if msg.Source == "stderr" {
-		return journal.Send(string(msg.Line), journal.PriErr, vars)
+		return journal.Send(string(msg.Line), journal.PriErr, s.vars)
 	}
-	return journal.Send(string(msg.Line), journal.PriInfo, vars)
+	return journal.Send(string(msg.Line), journal.PriInfo, s.vars)
 }
 
 func (s *journald) Name() string {

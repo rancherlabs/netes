@@ -33,9 +33,6 @@ function get-master-size {
   if [[ "${NUM_NODES}" -gt "500" ]]; then
     suggested_master_size=32
   fi
-  if [[ "${NUM_NODES}" -gt "3000" ]]; then
-    suggested_master_size=64
-  fi
   echo "${suggested_master_size}"
 }
 

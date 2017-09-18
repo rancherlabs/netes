@@ -14,6 +14,8 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",
+        "//pkg/apis/rbac/v1alpha1:go_default_library",
+        "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/client/retry:go_default_library",
@@ -33,8 +35,6 @@ go_library(
         "//pkg/registry/rbac/validation:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/rbac/v1alpha1:go_default_library",
-        "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",

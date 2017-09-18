@@ -15,13 +15,11 @@ type Volume struct {
 
 	Created string `json:"created,omitempty" yaml:"created,omitempty"`
 
-	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
-
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 
 	Driver string `json:"driver,omitempty" yaml:"driver,omitempty"`
 
-	DriverOpts map[string]interface{} `json:"driverOpts,omitempty" yaml:"driver_opts,omitempty"`
+	DriverOpts map[string]string `json:"driverOpts,omitempty" yaml:"driver_opts,omitempty"`
 
 	ExternalId string `json:"externalId,omitempty" yaml:"external_id,omitempty"`
 

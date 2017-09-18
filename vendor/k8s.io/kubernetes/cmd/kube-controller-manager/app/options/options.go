@@ -28,14 +28,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 
-	"github.com/cloudflare/cfssl/helpers"
+	//"github.com/cloudflare/cfssl/helpers"
 	"github.com/spf13/pflag"
 )
 
@@ -106,14 +106,14 @@ func NewCMServer() *CMServer {
 			ContentType:                           "application/vnd.kubernetes.protobuf",
 			KubeAPIQPS:                            20.0,
 			KubeAPIBurst:                          30,
-			LeaderElection:                        leaderelectionconfig.DefaultLeaderElectionConfiguration(),
+			LeaderElection:                        leaderelection.DefaultLeaderElectionConfiguration(),
 			ControllerStartInterval:               metav1.Duration{Duration: 0 * time.Second},
 			EnableGarbageCollector:                true,
 			ConcurrentGCSyncs:                     20,
 			GCIgnoredResources:                    gcIgnoredResources,
-			ClusterSigningCertFile:                "/etc/kubernetes/ca/ca.pem",
-			ClusterSigningKeyFile:                 "/etc/kubernetes/ca/ca.key",
-			ClusterSigningDuration:                metav1.Duration{Duration: helpers.OneYear},
+			//ClusterSigningCertFile:                "/etc/kubernetes/ca/ca.pem",
+			//ClusterSigningKeyFile:                 "/etc/kubernetes/ca/ca.key",
+			//ClusterSigningDuration:                metav1.Duration{Duration: helpers.OneYear},
 			ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 60 * time.Second},
 			EnableTaintManager:                    true,
 			HorizontalPodAutoscalerUseRESTClients: false,
@@ -225,9 +225,9 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.BoolVar(&s.DisableAttachDetachReconcilerSync, "disable-attach-detach-reconcile-sync", false, "Disable volume attach detach reconciler sync. Disabling this may cause volumes to be mismatched with pods. Use wisely.")
 	fs.DurationVar(&s.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", s.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
 	fs.BoolVar(&s.EnableTaintManager, "enable-taint-manager", s.EnableTaintManager, "WARNING: Beta feature. If set to true enables NoExecute Taints and will evict all not-tolerating Pod running on Nodes tainted with this kind of Taints.")
-	fs.BoolVar(&s.HorizontalPodAutoscalerUseRESTClients, "horizontal-pod-autoscaler-use-rest-clients", s.HorizontalPodAutoscalerUseRESTClients, "WARNING: alpha feature.  If set to true, causes the horizontal pod autoscaler controller to use REST clients through the kube-aggregator, instead of using the legacy metrics client through the API server proxy.  This is required for custom metrics support in the horizontal pod autoscaler.")
+	fs.BoolVar(&s.HorizontalPodAutoscalerUseRESTClients, "horizontal-pod-autoscaler-use-rest-clients", s.HorizontalPodAutoscalerUseRESTClients, "WARNING: alpha feature.  If set to true, causes the horizontal pod autoscaler controller to use REST clients through the kube-aggregator, instead of using the legacy metrics client through the API server proxy.  This is required for custom metrics support in the horizonal pod autoscaler.")
 
-	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
+	leaderelection.BindFlags(&s.LeaderElection, fs)
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }

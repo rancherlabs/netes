@@ -150,49 +150,18 @@ function detect-project() {
   fi
 }
 
-# Use gsutil to get the md5 hash for a particular tar
-function gsutil_get_tar_md5() {
-  # location_tar could be local or in the cloud
-  # local tar_location example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
-  # cloud tar_location example gs://kubernetes-staging-PROJECT/kubernetes-devel/kubernetes-server-linux-amd64.tar.gz
-  local -r tar_location=$1
-  #parse the output and return the md5 hash
-  #the sed command at the end removes whitespace
-  local -r tar_md5=$(gsutil hash -h -m ${tar_location} 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}' | sed 's/^[[:space:]]*//g')
-  echo "${tar_md5}"
-}
-
 # Copy a release tar and its accompanying hash.
 function copy-to-staging() {
   local -r staging_path=$1
   local -r gs_url=$2
   local -r tar=$3
   local -r hash=$4
-  local -r basename_tar=$(basename ${tar})
-
-  #check whether this tar alread exists and has the same hash
-  #if it matches, then don't bother uploading it again
-
-  #remote_tar_md5 checks the remote location for the existing tarball and its md5
-  #staging_path example gs://kubernetes-staging-PROJECT/kubernetes-devel
-  #basename_tar example kubernetes-server-linux-amd64.tar.gz
-  local -r remote_tar_md5=$(gsutil_get_tar_md5 "${staging_path}/${basename_tar}")
-  if [[ -n ${remote_tar_md5} ]]; then
-    #local_tar_md5 checks the remote location for the existing tarball and its md5 hash
-    #tar example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
-    local -r local_tar_md5=$(gsutil_get_tar_md5 "${tar}")
-    if [[ "${remote_tar_md5}" == "${local_tar_md5}" ]]; then
-      echo "+++ ${basename_tar} uploaded earlier, cloud and local file md5 match (md5 = ${local_tar_md5})"
-      return 0
-    fi
-  fi
 
   echo "${hash}" > "${tar}.sha1"
   gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
   gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1
-  echo "+++ ${basename_tar} uploaded (sha1 = ${hash})"
+  echo "+++ $(basename ${tar}) uploaded (sha1 = ${hash})"
 }
-
 
 # Given the cluster zone, return the list of regional GCS release
 # bucket suffixes for the release in preference order. GCS doesn't
@@ -345,11 +314,6 @@ function detect-node-names() {
         --format='value(instance)'))
     done
   fi
-  # Add heapster node name to the list too (if it exists).
-  if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
-    NODE_NAMES+=("${NODE_INSTANCE_PREFIX}-heapster")
-  fi
-
   echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]:-}" >&2
   echo "NODE_NAMES=${NODE_NAMES[*]:-}" >&2
 }
@@ -538,7 +502,7 @@ function get-template-name-from-version() {
 # Robustly try to create an instance template.
 # $1: The name of the instance template.
 # $2: The scopes flag.
-# $3: String of comma-separated metadata entries (must all be from a file).
+# $3 and others: Metadata entries (must all be from a file).
 function create-node-template() {
   detect-project
   local template_name="$1"
@@ -605,7 +569,7 @@ function create-node-template() {
       ${network} \
       ${preemptible_minions} \
       $2 \
-      --metadata-from-file $3 >&2; then
+      --metadata-from-file $(echo ${@:3} | tr ' ' ',') >&2; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template $template_name ${color_norm}" >&2
           exit 2
@@ -1242,24 +1206,21 @@ function create-nodes-firewall() {
   }
 }
 
-function get-scope-flags() {
+function create-nodes-template() {
+  echo "Creating minions."
+
+  # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
   if [[ -n "${NODE_SCOPES}" ]]; then
     scope_flags="--scopes ${NODE_SCOPES}"
   else
     scope_flags="--no-scopes"
   fi
-  echo "${scope_flags}"
-}
-
-function create-nodes-template() {
-  echo "Creating nodes."
-
-  local scope_flags=$(get-scope-flags)
 
   write-node-env
 
   local template_name="${NODE_INSTANCE_PREFIX}-template"
+
   create-node-instance-template $template_name
 }
 
@@ -1287,13 +1248,7 @@ function set_num_migs() {
 function create-nodes() {
   local template_name="${NODE_INSTANCE_PREFIX}-template"
 
-  if [[ -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
-    local -r nodes="${NUM_NODES}"
-  else
-    local -r nodes=$(( NUM_NODES - 1 ))
-  fi
-
-  local instances_left=${nodes}
+  local instances_left=${NUM_NODES}
 
   #TODO: parallelize this loop to speed up the process
   for ((i=1; i<=${NUM_MIGS}; i++)); do
@@ -1319,47 +1274,6 @@ function create-nodes() {
         --zone "${ZONE}" \
         --project "${PROJECT}" || true;
   done
-
-  if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
-    echo "Creating a special node for heapster with machine-type ${HEAPSTER_MACHINE_TYPE}"
-    create-heapster-node
-  fi
-}
-
-# Assumes:
-# - NODE_INSTANCE_PREFIX
-# - PROJECT
-# - ZONE
-# - HEAPSTER_MACHINE_TYPE
-# - NODE_DISK_TYPE
-# - NODE_DISK_SIZE
-# - NODE_IMAGE_PROJECT
-# - NODE_IMAGE
-# - NODE_TAG
-# - NETWORK
-# - ENABLE_IP_ALIASES
-# - IP_ALIAS_SUBNETWORK
-# - IP_ALIAS_SIZE
-function create-heapster-node() {
-  local network=$(make-gcloud-network-argument \
-      "${NETWORK}" "" \
-      "${ENABLE_IP_ALIASES:-}" \
-      "${IP_ALIAS_SUBNETWORK:-}" \
-      "${IP_ALIAS_SIZE:-}")
-
-  gcloud compute instances \
-      create "${NODE_INSTANCE_PREFIX}-heapster" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --machine-type="${HEAPSTER_MACHINE_TYPE}" \
-      --boot-disk-type "${NODE_DISK_TYPE}" \
-      --boot-disk-size "${NODE_DISK_SIZE}" \
-      --image-project="${NODE_IMAGE_PROJECT}" \
-      --image "${NODE_IMAGE}" \
-      --tags "${NODE_TAG}" \
-      ${network} \
-      $(get-scope-flags) \
-      --metadata-from-file "$(get-node-instance-metadata)"
 }
 
 # Assumes:
@@ -1560,20 +1474,6 @@ function kube-down() {
           "${template}"
       fi
     done
-
-    # Delete the special heapster node (if it exists).
-    if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
-      local -r heapster_machine_name="${NODE_INSTANCE_PREFIX}-heapster"
-      if gcloud compute instances describe "${heapster_machine_name}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
-        # Now we can safely delete the VM.
-        gcloud compute instances delete \
-          --project "${PROJECT}" \
-          --quiet \
-          --delete-disks all \
-          --zone "${ZONE}" \
-          "${heapster_machine_name}"
-      fi
-    fi
   fi
 
   local -r REPLICA_NAME="${KUBE_REPLICA_NAME:-$(get-replica-name)}"
@@ -1944,7 +1844,13 @@ function prepare-push() {
   if [[ "${node}" == "true" ]]; then
     write-node-env
 
-    local scope_flags=$(get-scope-flags)
+    # TODO(zmerlynn): Refactor setting scope flags.
+    local scope_flags=
+    if [[ -n "${NODE_SCOPES}" ]]; then
+      scope_flags="--scopes ${NODE_SCOPES}"
+    else
+      scope_flags="--no-scopes"
+    fi
 
     # Ugly hack: Since it is not possible to delete instance-template that is currently
     # being used, create a temp one, then delete the old one and recreate it once again.

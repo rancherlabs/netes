@@ -13,8 +13,6 @@ type Instance struct {
 
 	Created string `json:"created,omitempty" yaml:"created,omitempty"`
 
-	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
-
 	DependsOn []DependsOn `json:"dependsOn,omitempty" yaml:"depends_on,omitempty"`
 
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
@@ -36,6 +34,10 @@ type Instance struct {
 	Removed string `json:"removed,omitempty" yaml:"removed,omitempty"`
 
 	RevisionId string `json:"revisionId,omitempty" yaml:"revision_id,omitempty"`
+
+	ServiceId string `json:"serviceId,omitempty" yaml:"service_id,omitempty"`
+
+	ServiceIds []string `json:"serviceIds,omitempty" yaml:"service_ids,omitempty"`
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 

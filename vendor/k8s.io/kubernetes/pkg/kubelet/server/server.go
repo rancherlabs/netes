@@ -38,7 +38,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,6 +52,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -168,7 +168,7 @@ type AuthInterface interface {
 }
 
 // HostInterface contains all the kubelet methods required by the server.
-// For testability.
+// For testablitiy.
 type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
 	GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
@@ -272,7 +272,8 @@ func (s *Server) InstallDefaultHandlers() {
 		healthz.PingHealthz,
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
 	)
-	ws := new(restful.WebService)
+	var ws *restful.WebService
+	ws = new(restful.WebService)
 	ws.
 		Path("/pods").
 		Produces(restful.MIME_JSON)
@@ -307,8 +308,9 @@ const pprofBasePath = "/debug/pprof/"
 // InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
 func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	glog.Infof("Adding debug handlers to kubelet server.")
+	var ws *restful.WebService
 
-	ws := new(restful.WebService)
+	ws = new(restful.WebService)
 	ws.
 		Path("/run")
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
@@ -439,7 +441,7 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 	}
 	enterLoopTime := s.host.LatestLoopEntryTime()
 	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
-		return fmt.Errorf("sync Loop took longer than expected")
+		return fmt.Errorf("Sync Loop took longer than expected.")
 	}
 	return nil
 }
@@ -605,7 +607,7 @@ func getExecRequestParams(req *restful.Request) execRequestParams {
 		podName:       req.PathParameter("podID"),
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
-		cmd:           req.Request.URL.Query()[api.ExecCommandParam],
+		cmd:           req.Request.URL.Query()[api.ExecCommandParamm],
 	}
 }
 

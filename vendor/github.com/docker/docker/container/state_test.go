@@ -4,33 +4,18 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/docker/docker/api/types"
 )
-
-func TestIsValidHealthString(t *testing.T) {
-	contexts := []struct {
-		Health   string
-		Expected bool
-	}{
-		{types.Healthy, true},
-		{types.Unhealthy, true},
-		{types.Starting, true},
-		{types.NoHealthcheck, true},
-		{"fail", false},
-	}
-
-	for _, c := range contexts {
-		v := IsValidHealthString(c.Health)
-		if v != c.Expected {
-			t.Fatalf("Expected %t, but got %t", c.Expected, v)
-		}
-	}
-}
 
 func TestStateRunStop(t *testing.T) {
 	s := NewState()
 	for i := 1; i < 3; i++ { // full lifecycle two times
+		started := make(chan struct{})
+		var pid int64
+		go func() {
+			runPid, _ := s.WaitRunning(-1 * time.Second)
+			atomic.StoreInt64(&pid, int64(runPid))
+			close(started)
+		}()
 		s.Lock()
 		s.SetRunning(i+100, false)
 		s.Unlock()
@@ -41,8 +26,21 @@ func TestStateRunStop(t *testing.T) {
 		if s.Pid != i+100 {
 			t.Fatalf("Pid %v, expected %v", s.Pid, i+100)
 		}
-		if s.ExitCode() != 0 {
-			t.Fatalf("ExitCode %v, expected 0", s.ExitCode())
+		if s.ExitCode != 0 {
+			t.Fatalf("ExitCode %v, expected 0", s.ExitCode)
+		}
+		select {
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("Start callback doesn't fire in 100 milliseconds")
+		case <-started:
+			t.Log("Start callback fired")
+		}
+		runPid := int(atomic.LoadInt64(&pid))
+		if runPid != i+100 {
+			t.Fatalf("Pid %v, expected %v", runPid, i+100)
+		}
+		if pid, err := s.WaitRunning(-1 * time.Second); err != nil || pid != i+100 {
+			t.Fatalf("WaitRunning returned pid: %v, err: %v, expected pid: %v, err: %v", pid, err, i+100, nil)
 		}
 
 		stopped := make(chan struct{})
@@ -52,14 +50,12 @@ func TestStateRunStop(t *testing.T) {
 			atomic.StoreInt64(&exit, int64(exitCode))
 			close(stopped)
 		}()
-		s.Lock()
-		s.SetStopped(&ExitStatus{ExitCode: i})
-		s.Unlock()
+		s.SetStoppedLocking(&ExitStatus{ExitCode: i})
 		if s.IsRunning() {
 			t.Fatal("State is running")
 		}
-		if s.ExitCode() != i {
-			t.Fatalf("ExitCode %v, expected %v", s.ExitCode(), i)
+		if s.ExitCode != i {
+			t.Fatalf("ExitCode %v, expected %v", s.ExitCode, i)
 		}
 		if s.Pid != 0 {
 			t.Fatalf("Pid %v, expected 0", s.Pid)
@@ -82,32 +78,32 @@ func TestStateRunStop(t *testing.T) {
 
 func TestStateTimeoutWait(t *testing.T) {
 	s := NewState()
-	stopped := make(chan struct{})
+	started := make(chan struct{})
 	go func() {
-		s.WaitStop(100 * time.Millisecond)
-		close(stopped)
+		s.WaitRunning(100 * time.Millisecond)
+		close(started)
 	}()
 	select {
 	case <-time.After(200 * time.Millisecond):
-		t.Fatal("Stop callback doesn't fire in 200 milliseconds")
-	case <-stopped:
-		t.Log("Stop callback fired")
+		t.Fatal("Start callback doesn't fire in 100 milliseconds")
+	case <-started:
+		t.Log("Start callback fired")
 	}
 
 	s.Lock()
-	s.SetStopped(&ExitStatus{ExitCode: 1})
+	s.SetRunning(49, false)
 	s.Unlock()
 
-	stopped = make(chan struct{})
+	stopped := make(chan struct{})
 	go func() {
-		s.WaitStop(100 * time.Millisecond)
+		s.WaitRunning(100 * time.Millisecond)
 		close(stopped)
 	}()
 	select {
 	case <-time.After(200 * time.Millisecond):
-		t.Fatal("Stop callback doesn't fire in 100 milliseconds")
+		t.Fatal("Start callback doesn't fire in 100 milliseconds")
 	case <-stopped:
-		t.Log("Stop callback fired")
+		t.Log("Start callback fired")
 	}
 
 }

@@ -29,7 +29,7 @@ import (
 
 	"github.com/golang/glog"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/kubectl/util"
+	"k8s.io/kubernetes/pkg/util"
 )
 
 const (
@@ -108,8 +108,7 @@ func (f *FilterServer) accept(method, path, host string) bool {
 	return false
 }
 
-// HandlerFor makes a shallow copy of f which passes its requests along to the
-// new delegate.
+// Make a copy of f which passes requests along to the new delegate.
 func (f *FilterServer) HandlerFor(delegate http.Handler) *FilterServer {
 	f2 := *f
 	f2.delegate = delegate

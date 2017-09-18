@@ -1,35 +1,26 @@
----
-title: "exec"
-description: "The exec command description and usage"
-keywords: "command, container, run, execute"
----
-
-<!-- This file is maintained within the docker/docker Github
-     repository at https://github.com/docker/docker/. Make all
-     pull requests against that repo. If you see this file in
-     another repository, consider it read-only there, as it will
-     periodically be overwritten by the definitive file. Pull
-     requests which include edits to this file in other repositories
-     will be rejected.
--->
+<!--[metadata]>
++++
+title = "exec"
+description = "The exec command description and usage"
+keywords = ["command, container, run, execute"]
+[menu.main]
+parent = "smn_cli"
++++
+<![end-metadata]-->
 
 # exec
 
-```markdown
-Usage:  docker exec [OPTIONS] CONTAINER COMMAND [ARG...]
+    Usage: docker exec [OPTIONS] CONTAINER COMMAND [ARG...]
 
-Run a command in a running container
+    Run a command in a running container
 
-Options:
-  -d, --detach         Detached mode: run command in the background
-      --detach-keys    Override the key sequence for detaching a container
-  -e, --env=[]         Set environment variables
-      --help           Print usage
-  -i, --interactive    Keep STDIN open even if not attached
-      --privileged     Give extended privileges to the command
-  -t, --tty            Allocate a pseudo-TTY
-  -u, --user           Username or UID (format: <name|uid>[:<group|gid>])
-```
+      -d, --detach               Detached mode: run command in the background
+      --detach-keys              Specify the escape key sequence used to detach a container
+      --help                     Print usage
+      -i, --interactive          Keep STDIN open even if not attached
+      --privileged               Give extended Linux capabilities to the command
+      -t, --tty                  Allocate a pseudo-TTY
+      -u, --user=                Username or UID (format: <name|uid>[:<group|gid>])
 
 The `docker exec` command runs a new command in a running container.
 

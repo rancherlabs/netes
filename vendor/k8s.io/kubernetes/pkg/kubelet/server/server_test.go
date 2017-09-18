@@ -38,7 +38,6 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,8 +49,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
-	// Do some initialization to decode the query parameters correctly.
-	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -252,6 +250,21 @@ func newServerTest() *serverTestFramework {
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
+}
+
+// encodeJSON returns obj marshalled as a JSON string, panicing on any errors
+func encodeJSON(obj interface{}) string {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		panic(err)
+	}
+	return string(data)
+}
+
+func readResp(resp *http.Response) (string, error) {
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	return string(body), err
 }
 
 // A helper function to return the correct pod name.

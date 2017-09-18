@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -68,7 +69,7 @@ func CreateNamespace(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 	case cmdutil.NamespaceV1GeneratorName:
 		generator = &kubectl.NamespaceGeneratorV1{Name: name}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

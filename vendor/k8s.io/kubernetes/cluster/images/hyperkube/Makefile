@@ -23,8 +23,6 @@ TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 CNI_RELEASE=0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff
 CACHEBUST?=1
 QEMUVERSION=v2.7.0
-HYPERKUBE_BIN?=_output/dockerized/bin/linux/${ARCH}/hyperkube
-HOSTARCH?=amd64
 
 UNAME_S:=$(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -64,8 +62,7 @@ endif
 	cp -r ./* ${TEMP_DIR}
 	mkdir -p ${TEMP_DIR}/cni-bin
 
-	cp ../../../${HYPERKUBE_BIN} ${TEMP_DIR}
-
+	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
 	chmod a+rx ${TEMP_DIR}/hyperkube
 
 	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
@@ -74,8 +71,8 @@ ifeq ($(CACHEBUST),1)
 	cd ${TEMP_DIR} && sed -i.back "s|CACHEBUST|$(shell uuidgen)|g" Dockerfile
 endif
 
-ifeq ($(ARCH),$(HOSTARCH))
-	# When building "normally", remove the whole line, it has no part in the image
+ifeq ($(ARCH),amd64)
+	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
 	cd ${TEMP_DIR} && ${SED_CMD} "/CROSS_BUILD_/d" Dockerfile
 else
 	cd ${TEMP_DIR} && ${SED_CMD} "s/CROSS_BUILD_//g" Dockerfile

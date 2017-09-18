@@ -506,7 +506,9 @@ func extractResourceList(objs []runtime.Object) ([]runtime.Object, error) {
 		if err != nil {
 			return nil, err
 		}
-		finalObjs = append(finalObjs, items...)
+		for _, item := range items {
+			finalObjs = append(finalObjs, item)
+		}
 	}
 	return finalObjs, nil
 }

@@ -29,7 +29,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,7 +37,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -90,7 +89,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 				for _, pod := range update.Pods {
 					// TODO: remove the conversion when validation is performed on versioned objects.
 					internalPod := &api.Pod{}
-					if err := k8s_api_v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+					if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
 						t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 					}
 					if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
@@ -373,7 +372,7 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 			for _, pod := range update.Pods {
 				// TODO: remove the conversion when validation is performed on versioned objects.
 				internalPod := &api.Pod{}
-				if err := k8s_api_v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+				if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
 					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 				}
 				if errs := validation.ValidatePod(internalPod); len(errs) > 0 {

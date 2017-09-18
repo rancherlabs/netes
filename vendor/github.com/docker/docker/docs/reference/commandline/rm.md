@@ -1,31 +1,23 @@
----
-title: "rm"
-description: "The rm command description and usage"
-keywords: "remove, Docker, container"
----
-
-<!-- This file is maintained within the docker/docker Github
-     repository at https://github.com/docker/docker/. Make all
-     pull requests against that repo. If you see this file in
-     another repository, consider it read-only there, as it will
-     periodically be overwritten by the definitive file. Pull
-     requests which include edits to this file in other repositories
-     will be rejected.
--->
+<!--[metadata]>
++++
+title = "rm"
+description = "The rm command description and usage"
+keywords = ["remove, Docker, container"]
+[menu.main]
+parent = "smn_cli"
++++
+<![end-metadata]-->
 
 # rm
 
-```markdown
-Usage:  docker rm [OPTIONS] CONTAINER [CONTAINER...]
+    Usage: docker rm [OPTIONS] CONTAINER [CONTAINER...]
 
-Remove one or more containers
+    Remove one or more containers
 
-Options:
-  -f, --force     Force the removal of a running container (uses SIGKILL)
-      --help      Print usage
-  -l, --link      Remove the specified link
-  -v, --volumes   Remove the volumes associated with the container
-```
+      -f, --force            Force the removal of a running container (uses SIGKILL)
+      --help                 Print usage
+      -l, --link             Remove the specified link
+      -v, --volumes          Remove the volumes associated with the container
 
 ## Examples
 

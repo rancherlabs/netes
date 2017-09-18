@@ -6,21 +6,20 @@ import (
 	"strconv"
 	"time"
 
-	"golang.org/x/net/context"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/backend"
-	containertypes "github.com/docker/docker/api/types/container"
-	timetypes "github.com/docker/docker/api/types/time"
 	"github.com/docker/docker/container"
 	"github.com/docker/docker/daemon/logger"
+	"github.com/docker/docker/daemon/logger/jsonfilelog"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/stdcopy"
+	containertypes "github.com/docker/engine-api/types/container"
+	timetypes "github.com/docker/engine-api/types/time"
 )
 
 // ContainerLogs hooks up a container's stdout and stderr streams
 // configured with the given struct.
-func (daemon *Daemon) ContainerLogs(ctx context.Context, containerName string, config *backend.ContainerLogsConfig, started chan struct{}) error {
+func (daemon *Daemon) ContainerLogs(containerName string, config *backend.ContainerLogsConfig, started chan struct{}) error {
 	container, err := daemon.GetContainer(containerName)
 	if err != nil {
 		return err
@@ -67,8 +66,7 @@ func (daemon *Daemon) ContainerLogs(ctx context.Context, containerName string, c
 	close(started)
 	wf.Flush()
 
-	var outStream io.Writer
-	outStream = wf
+	var outStream io.Writer = wf
 	errStream := outStream
 	if !container.Config.Tty {
 		errStream = stdcopy.NewStdWriter(outStream, stdcopy.Stderr)
@@ -80,26 +78,16 @@ func (daemon *Daemon) ContainerLogs(ctx context.Context, containerName string, c
 		case err := <-logs.Err:
 			logrus.Errorf("Error streaming logs: %v", err)
 			return nil
-		case <-ctx.Done():
+		case <-config.Stop:
 			logs.Close()
 			return nil
 		case msg, ok := <-logs.Msg:
 			if !ok {
-				logrus.Debug("logs: end stream")
+				logrus.Debugf("logs: end stream")
 				logs.Close()
-				if cLog != container.LogDriver {
-					// Since the logger isn't cached in the container, which occurs if it is running, it
-					// must get explicitly closed here to avoid leaking it and any file handles it has.
-					if err := cLog.Close(); err != nil {
-						logrus.Errorf("Error closing logger: %v", err)
-					}
-				}
 				return nil
 			}
 			logLine := msg.Line
-			if config.Details {
-				logLine = append([]byte(msg.Attrs.String()+" "), logLine...)
-			}
 			if config.Timestamps {
 				logLine = append([]byte(msg.Timestamp.Format(logger.TimeFormat)+" "), logLine...)
 			}
@@ -117,26 +105,50 @@ func (daemon *Daemon) getLogger(container *container.Container) (logger.Logger, 
 	if container.LogDriver != nil && container.IsRunning() {
 		return container.LogDriver, nil
 	}
-	return container.StartLogger(container.HostConfig.LogConfig)
+	cfg := daemon.getLogConfig(container.HostConfig.LogConfig)
+	if err := logger.ValidateLogOpts(cfg.Type, cfg.Config); err != nil {
+		return nil, err
+	}
+	return container.StartLogger(cfg)
 }
 
-// mergeLogConfig merges the daemon log config to the container's log config if the container's log driver is not specified.
-func (daemon *Daemon) mergeAndVerifyLogConfig(cfg *containertypes.LogConfig) error {
-	if cfg.Type == "" {
-		cfg.Type = daemon.defaultLogConfig.Type
+// StartLogging initializes and starts the container logging stream.
+func (daemon *Daemon) StartLogging(container *container.Container) error {
+	cfg := daemon.getLogConfig(container.HostConfig.LogConfig)
+	if cfg.Type == "none" {
+		return nil // do not start logging routines
 	}
 
-	if cfg.Config == nil {
-		cfg.Config = make(map[string]string)
+	if err := logger.ValidateLogOpts(cfg.Type, cfg.Config); err != nil {
+		return err
+	}
+	l, err := container.StartLogger(cfg)
+	if err != nil {
+		return fmt.Errorf("Failed to initialize logging driver: %v", err)
 	}
 
-	if cfg.Type == daemon.defaultLogConfig.Type {
-		for k, v := range daemon.defaultLogConfig.Config {
-			if _, ok := cfg.Config[k]; !ok {
-				cfg.Config[k] = v
-			}
+	copier := logger.NewCopier(container.ID, map[string]io.Reader{"stdout": container.StdoutPipe(), "stderr": container.StderrPipe()}, l)
+	container.LogCopier = copier
+	copier.Run()
+	container.LogDriver = l
+
+	// set LogPath field only for json-file logdriver
+	if jl, ok := l.(*jsonfilelog.JSONFileLogger); ok {
+		container.LogPath = jl.LogPath()
+	}
+
+	return nil
+}
+
+// getLogConfig returns the log configuration for the container.
+func (daemon *Daemon) getLogConfig(cfg containertypes.LogConfig) containertypes.LogConfig {
+	if cfg.Type != "" || len(cfg.Config) > 0 { // container has log driver configured
+		if cfg.Type == "" {
+			cfg.Type = jsonfilelog.Name
 		}
+		return cfg
 	}
 
-	return logger.ValidateLogOpts(cfg.Type, cfg.Config)
+	// Use daemon's default log config for containers
+	return daemon.defaultLogConfig
 }

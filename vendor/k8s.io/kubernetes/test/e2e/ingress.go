@@ -21,9 +21,9 @@ import (
 	"path/filepath"
 	"time"
 
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -36,7 +36,6 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		ns               string
 		jig              *framework.IngressTestJig
 		conformanceTests []framework.IngressConformanceTests
-		cloudConfig      framework.CloudConfig
 	)
 	f := framework.NewDefaultFramework("ingress")
 
@@ -44,7 +43,6 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		f.BeforeEach()
 		jig = framework.NewIngressTestJig(f.ClientSet)
 		ns = f.Namespace.Name
-		cloudConfig = framework.TestContext.CloudConfig
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
@@ -124,12 +122,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 
 			By("should have correct firewall rule for ingress")
 			fw := gceController.GetFirewallRule()
-			nodeTags := []string{cloudConfig.NodeTag}
-			if framework.TestContext.Provider != "gce" {
-				// nodeTags would be different in GKE.
-				nodeTags = framework.GetNodeTags(jig.Client, cloudConfig)
-			}
-			expFw := jig.ConstructFirewallForIngress(gceController, nodeTags)
+			expFw := jig.ConstructFirewallForIngress(gceController)
 			// Passed the last argument as `true` to verify the backend ports is a subset
 			// of the allowed ports in firewall rule, given there may be other existing
 			// ingress resources and backends we are not aware of.

@@ -25,7 +25,6 @@ import (
 	"testing"
 	"time"
 
-	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	finalizersutil "k8s.io/kubernetes/federation/pkg/federation-controller/util/finalizers"
 	"k8s.io/kubernetes/pkg/api"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"

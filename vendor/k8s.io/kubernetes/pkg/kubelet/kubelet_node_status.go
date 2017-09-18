@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -58,10 +57,10 @@ const (
 	maxNamesPerImageInNodeStatus = 5
 )
 
-// registerWithAPIServer registers the node with the cluster master. It is safe
+// registerWithApiServer registers the node with the cluster master. It is safe
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
-func (kl *Kubelet) registerWithAPIServer() {
+func (kl *Kubelet) registerWithApiServer() {
 	if kl.registrationCompleted {
 		return
 	}
@@ -81,7 +80,7 @@ func (kl *Kubelet) registerWithAPIServer() {
 		}
 
 		glog.Infof("Attempting to register node %s", node.Name)
-		registered := kl.tryRegisterWithAPIServer(node)
+		registered := kl.tryRegisterWithApiServer(node)
 		if registered {
 			glog.Infof("Successfully registered node %s", node.Name)
 			kl.registrationCompleted = true
@@ -90,14 +89,14 @@ func (kl *Kubelet) registerWithAPIServer() {
 	}
 }
 
-// tryRegisterWithAPIServer makes an attempt to register the given node with
+// tryRegisterWithApiServer makes an attempt to register the given node with
 // the API server, returning a boolean indicating whether the attempt was
 // successful.  If a node with the same name already exists, it reconciles the
 // value of the annotation for controller-managed attach-detach of attachable
 // persistent volumes for the node.  If a node of the same name exists but has
 // a different externalID value, it attempts to delete that node so that a
 // later attempt can recreate it.
-func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
+func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 	_, err := kl.kubeClient.Core().Nodes().Create(node)
 	if err == nil {
 		return true
@@ -211,7 +210,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 	if len(kl.kubeletConfiguration.RegisterWithTaints) > 0 {
 		taints := make([]v1.Taint, len(kl.kubeletConfiguration.RegisterWithTaints))
 		for i := range kl.kubeletConfiguration.RegisterWithTaints {
-			if err := k8s_api_v1.Convert_api_Taint_To_v1_Taint(&kl.kubeletConfiguration.RegisterWithTaints[i], &taints[i], nil); err != nil {
+			if err := v1.Convert_api_Taint_To_v1_Taint(&kl.kubeletConfiguration.RegisterWithTaints[i], &taints[i], nil); err != nil {
 				return nil, err
 			}
 		}
@@ -344,7 +343,7 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 	if kl.registerNode {
 		// This will exit immediately if it doesn't need to do anything.
-		kl.registerWithAPIServer()
+		kl.registerWithApiServer()
 	}
 	if err := kl.updateNodeStatus(); err != nil {
 		glog.Errorf("Unable to update node status: %v", err)
@@ -499,10 +498,11 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		if ipAddr == nil {
 			// We tried everything we could, but the IP address wasn't fetchable; error out
 			return fmt.Errorf("can't get ip address of node %s. error: %v", node.Name, err)
-		}
-		node.Status.Addresses = []v1.NodeAddress{
-			{Type: v1.NodeInternalIP, Address: ipAddr.String()},
-			{Type: v1.NodeHostName, Address: kl.GetHostname()},
+		} else {
+			node.Status.Addresses = []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: ipAddr.String()},
+				{Type: v1.NodeHostName, Address: kl.GetHostname()},
+			}
 		}
 	}
 	return nil
@@ -695,7 +695,7 @@ func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
 	}
 
 	// Append AppArmor status if it's enabled.
-	// TODO(tallclair): This is a temporary message until node feature reporting is added.
+	// TODO(timstclair): This is a temporary message until node feature reporting is added.
 	if newNodeReadyCondition.Status == v1.ConditionTrue &&
 		kl.appArmorValidator != nil && kl.appArmorValidator.ValidateHost() == nil {
 		newNodeReadyCondition.Message = fmt.Sprintf("%s. AppArmor enabled", newNodeReadyCondition.Message)

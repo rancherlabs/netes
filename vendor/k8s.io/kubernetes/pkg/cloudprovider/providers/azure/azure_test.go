@@ -17,16 +17,12 @@ limitations under the License.
 package azure
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api/v1"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
 	"github.com/Azure/azure-sdk-for-go/arm/network"
@@ -818,62 +814,5 @@ func TestSplitProviderID(t *testing.T) {
 			t.Errorf("Expected %v, but got %v", test.name, name)
 		}
 
-	}
-}
-
-func TestMetadataParsing(t *testing.T) {
-	data := `
-{
-    "interface": [
-      {
-        "ipv4": {
-          "ipAddress": [
-            {
-              "privateIpAddress": "10.0.1.4",
-              "publicIpAddress": "X.X.X.X"
-            }
-          ],
-          "subnet": [
-            {
-              "address": "10.0.1.0",
-              "prefix": "24"
-            }
-          ]
-        },
-        "ipv6": {
-          "ipAddress": [
-
-          ]
-        },
-        "macAddress": "002248020E1E"
-      }
-    ]
-}	
-`
-
-	network := NetworkMetadata{}
-	if err := json.Unmarshal([]byte(data), &network); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	ip := network.Interface[0].IPV4.IPAddress[0].PrivateIP
-	if ip != "10.0.1.4" {
-		t.Errorf("Unexpected value: %s, expected 10.0.1.4", ip)
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, data)
-	}))
-	defer server.Close()
-
-	SetMetadataURLForTesting(server.URL)
-
-	networkJSON := NetworkMetadata{}
-	if err := QueryMetadataJSON("/some/path", &networkJSON); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	if !reflect.DeepEqual(network, networkJSON) {
-		t.Errorf("Unexpected inequality:\n%#v\nvs\n%#v", network, networkJSON)
 	}
 }

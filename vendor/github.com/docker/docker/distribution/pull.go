@@ -4,14 +4,42 @@ import (
 	"fmt"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/distribution/metadata"
+	"github.com/docker/docker/distribution/xfer"
+	"github.com/docker/docker/image"
 	"github.com/docker/docker/pkg/progress"
 	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
+	"github.com/docker/engine-api/types"
 	"golang.org/x/net/context"
 )
+
+// ImagePullConfig stores pull configuration.
+type ImagePullConfig struct {
+	// MetaHeaders stores HTTP headers with metadata about the image
+	MetaHeaders map[string][]string
+	// AuthConfig holds authentication credentials for authenticating with
+	// the registry.
+	AuthConfig *types.AuthConfig
+	// ProgressOutput is the interface for showing the status of the pull
+	// operation.
+	ProgressOutput progress.Output
+	// RegistryService is the registry service to use for TLS configuration
+	// and endpoint lookup.
+	RegistryService *registry.Service
+	// ImageEventLogger notifies events for a given image
+	ImageEventLogger func(id, name, action string)
+	// MetadataStore is the storage backend for distribution-specific
+	// metadata.
+	MetadataStore metadata.Store
+	// ImageStore manages images.
+	ImageStore image.Store
+	// ReferenceStore manages tags.
+	ReferenceStore reference.Store
+	// DownloadManager manages concurrent pulls.
+	DownloadManager *xfer.LayerDownloadManager
+}
 
 // Puller is an interface that abstracts pulling for different API versions.
 type Puller interface {
@@ -56,7 +84,7 @@ func Pull(ctx context.Context, ref reference.Named, imagePullConfig *ImagePullCo
 	}
 
 	// makes sure name is not empty or `scratch`
-	if err := ValidateRepoName(repoInfo.Name()); err != nil {
+	if err := validateRepoName(repoInfo.Name()); err != nil {
 		return err
 	}
 
@@ -69,7 +97,7 @@ func Pull(ctx context.Context, ref reference.Named, imagePullConfig *ImagePullCo
 		lastErr error
 
 		// discardNoSupportErrors is used to track whether an endpoint encountered an error of type registry.ErrNoSupport
-		// By default it is false, which means that if an ErrNoSupport error is encountered, it will be saved in lastErr.
+		// By default it is false, which means that if a ErrNoSupport error is encountered, it will be saved in lastErr.
 		// As soon as another kind of error is encountered, discardNoSupportErrors is set to true, avoiding the saving of
 		// any subsequent ErrNoSupport errors in lastErr.
 		// It's needed for pull-by-digest on v1 endpoints: if there are only v1 endpoints configured, the error should be
@@ -88,10 +116,6 @@ func Pull(ctx context.Context, ref reference.Named, imagePullConfig *ImagePullCo
 		confirmedTLSRegistries = make(map[string]struct{})
 	)
 	for _, endpoint := range endpoints {
-		if imagePullConfig.RequireSchema2 && endpoint.Version == registry.APIVersion1 {
-			continue
-		}
-
 		if confirmedV2 && endpoint.Version == registry.APIVersion1 {
 			logrus.Debugf("Skipping v1 endpoint %s because v2 registry was detected", endpoint.URL)
 			continue
@@ -143,7 +167,7 @@ func Pull(ctx context.Context, ref reference.Named, imagePullConfig *ImagePullCo
 				continue
 			}
 			logrus.Errorf("Not continuing with pull after error: %v", err)
-			return TranslatePullError(err, ref)
+			return err
 		}
 
 		imagePullConfig.ImageEventLogger(ref.String(), repoInfo.Name(), "pull")
@@ -154,7 +178,7 @@ func Pull(ctx context.Context, ref reference.Named, imagePullConfig *ImagePullCo
 		lastErr = fmt.Errorf("no endpoints found for %s", ref.String())
 	}
 
-	return TranslatePullError(lastErr, ref)
+	return lastErr
 }
 
 // writeStatus writes a status message to out. If layersDownloaded is true, the
@@ -169,8 +193,8 @@ func writeStatus(requestedTag string, out progress.Output, layersDownloaded bool
 	}
 }
 
-// ValidateRepoName validates the name of a repository.
-func ValidateRepoName(name string) error {
+// validateRepoName validates the name of a repository.
+func validateRepoName(name string) error {
 	if name == "" {
 		return fmt.Errorf("Repository name can't be empty")
 	}
@@ -178,23 +202,4 @@ func ValidateRepoName(name string) error {
 		return fmt.Errorf("'%s' is a reserved name", api.NoBaseImageSpecifier)
 	}
 	return nil
-}
-
-func addDigestReference(store reference.Store, ref reference.Named, dgst digest.Digest, id digest.Digest) error {
-	dgstRef, err := reference.WithDigest(reference.TrimNamed(ref), dgst)
-	if err != nil {
-		return err
-	}
-
-	if oldTagID, err := store.Get(dgstRef); err == nil {
-		if oldTagID != id {
-			// Updating digests not supported by reference store
-			logrus.Errorf("Image ID for digest %s changed from %s to %s, cannot update", dgst.String(), oldTagID, id)
-		}
-		return nil
-	} else if err != reference.ErrDoesNotExist {
-		return err
-	}
-
-	return store.AddDigest(dgstRef, id, true)
 }

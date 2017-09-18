@@ -19,16 +19,15 @@ const (
 	defaultTimeOut = 30
 )
 
-func newTransport(addr string, tlsConfig *tlsconfig.Options) (transport.Transport, error) {
+// NewClient creates a new plugin client (http).
+func NewClient(addr string, tlsConfig tlsconfig.Options) (*Client, error) {
 	tr := &http.Transport{}
 
-	if tlsConfig != nil {
-		c, err := tlsconfig.Client(*tlsConfig)
-		if err != nil {
-			return nil, err
-		}
-		tr.TLSClientConfig = c
+	c, err := tlsconfig.Client(tlsConfig)
+	if err != nil {
+		return nil, err
 	}
+	tr.TLSClientConfig = c
 
 	u, err := url.Parse(addr)
 	if err != nil {
@@ -44,33 +43,15 @@ func newTransport(addr string, tlsConfig *tlsconfig.Options) (transport.Transpor
 	}
 	scheme := httpScheme(u)
 
-	return transport.NewHTTPTransport(tr, scheme, socket), nil
+	clientTransport := transport.NewHTTPTransport(tr, scheme, socket)
+	return NewClientWithTransport(clientTransport), nil
 }
 
-// NewClient creates a new plugin client (http).
-func NewClient(addr string, tlsConfig *tlsconfig.Options) (*Client, error) {
-	clientTransport, err := newTransport(addr, tlsConfig)
-	if err != nil {
-		return nil, err
-	}
-	return newClientWithTransport(clientTransport, 0), nil
-}
-
-// NewClientWithTimeout creates a new plugin client (http).
-func NewClientWithTimeout(addr string, tlsConfig *tlsconfig.Options, timeoutInSecs int) (*Client, error) {
-	clientTransport, err := newTransport(addr, tlsConfig)
-	if err != nil {
-		return nil, err
-	}
-	return newClientWithTransport(clientTransport, timeoutInSecs), nil
-}
-
-// newClientWithTransport creates a new plugin client with a given transport.
-func newClientWithTransport(tr transport.Transport, timeoutInSecs int) *Client {
+// NewClientWithTransport creates a new plugin client with a given transport.
+func NewClientWithTransport(tr transport.Transport) *Client {
 	return &Client{
 		http: &http.Client{
 			Transport: tr,
-			Timeout:   time.Duration(timeoutInSecs) * time.Second,
 		},
 		requestFactory: tr,
 	}
@@ -149,7 +130,7 @@ func (c *Client) callWithRetry(serviceMethod string, data io.Reader, retry bool)
 				return nil, err
 			}
 			retries++
-			logrus.Warnf("Unable to connect to plugin: %s%s: %v, retrying in %v", req.URL.Host, req.URL.Path, err, timeOff)
+			logrus.Warnf("Unable to connect to plugin: %s:%s, retrying in %v", req.URL.Host, req.URL.Path, timeOff)
 			time.Sleep(timeOff)
 			continue
 		}

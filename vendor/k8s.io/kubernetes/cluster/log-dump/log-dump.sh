@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2017 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ set -o nounset
 set -o pipefail
 
 readonly report_dir="${1:-_artifacts}"
-readonly gcs_artifacts_dir="${2:-}"
 
 # In order to more trivially extend log-dump for custom deployments,
 # check for a function named log_dump_custom_get_instances. If it's
@@ -206,39 +205,27 @@ function dump_masters() {
 
 function dump_nodes() {
   local node_names
-  if [[ -n "${1:-}" ]]; then
-    echo "Dumping logs for nodes provided as args to dump_nodes() function"
-    node_names=( "$@" )
-  elif [[ -n "${use_custom_instance_list}" ]]; then
-    echo "Dumping logs for nodes provided by log_dump_custom_get_instances() function"
+  if [[ -n "${use_custom_instance_list}" ]]; then
     node_names=( $(log_dump_custom_get_instances node) )
   elif [[ ! "${node_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Node SSH not supported for ${KUBERNETES_PROVIDER}"
     return
   else
-    echo "Detecting nodes in the cluster"
     detect-node-names &> /dev/null
+    if [[ "${#NODE_NAMES[@]}" -eq 0 ]]; then
+      echo "Nodes not detected. Is the cluster up?"
+      return
+    fi
     node_names=( "${NODE_NAMES[@]}" )
   fi
 
   if [[ "${#node_names[@]}" == 0 ]]; then
-    echo "No nodes found!"
+    echo "No nodes found?"
     return
   fi
 
-  nodes_selected_for_logs=()
-  if [[ -n "${LOGDUMP_ONLY_N_RANDOM_NODES:-}" ]]; then
-    # We randomly choose 'LOGDUMP_ONLY_N_RANDOM_NODES' many nodes for fetching logs.
-    for index in `shuf -i 0-$(( ${#node_names[*]} - 1 )) -n ${LOGDUMP_ONLY_N_RANDOM_NODES}`
-    do
-      nodes_selected_for_logs+=("${node_names[$index]}")
-    done
-  else
-    nodes_selected_for_logs=( "${node_names[@]}" )
-  fi
-
   proc=${max_scp_processes}
-  for node_name in "${nodes_selected_for_logs[@]}"; do
+  for node_name in "${node_names[@]}"; do
     node_dir="${report_dir}/${node_name}"
     mkdir -p "${node_dir}"
     # Save logs in the background. This speeds up things when there are
@@ -260,100 +247,12 @@ function dump_nodes() {
   fi
 }
 
-function dump_nodes_with_logexporter() {
-  echo "Detecting nodes in the cluster"
-  detect-node-names &> /dev/null
-
-  if [[ "${#NODE_NAMES[@]}" == 0 ]]; then
-    echo "No nodes found!"
-    return
-  fi
-
-  # Obtain parameters required by logexporter.
-  local -r service_account_credentials="$(cat ${GOOGLE_APPLICATION_CREDENTIALS} | base64)"
-  local -r cloud_provider="${KUBERNETES_PROVIDER}"
-  local -r enable_hollow_node_logs="${ENABLE_HOLLOW_NODE_LOGS:-false}"
-  local -r logexport_timeout_seconds="$(( 30 + NUM_NODES / 10 ))"
-
-  # Fill in the parameters in the logexporter daemonset template.
-  sed -i'' -e "s/{{.ServiceAccountCredentials}}/${service_account_credentials}/g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s/{{.CloudProvider}}/${cloud_provider}/g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s/{{.GCSPath}}/${gcs_artifacts_dir}/g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s/{{.EnableHollowNodeLogs}}/${enable_hollow_node_logs}/g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-
-  # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
-  KUBECTL="${KUBECTL:-${KUBE_ROOT}/cluster/kubectl.sh}"
-  "${KUBECTL}" create -f "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-
-  # Give some time for the pods to finish uploading logs.
-  sleep "${logexport_sleep_seconds}"
-
-  # List the logexporter pods created and their corresponding nodes.
-  pods_and_nodes=()
-  for retry in {1..5}; do
-    pods_and_nodes=$(${KUBECTL} get pods -n logexporter -o=custom-columns=NAME:.metadata.name,NODE:.spec.nodeName | tail -n +2)
-    if [[ -n "${pods_and_nodes}" ]]; then
-      echo -e "List of logexporter pods found:\n${pods_and_nodes}"
-      break
-    fi
-    if [[ "${retry}" == 5 ]]; then
-      echo "Failed to list any logexporter pods after multiple retries.. falling back to logdump for nodes through SSH"
-      "${KUBECTL}" delete namespace logexporter
-      dump_nodes "${NODE_NAMES[@]}"
-      return
-    fi
-  done
-
-  # Collect names of nodes we didn't find a logexporter pod on.
-  # Note: This step is O(#nodes^2) as we check if each node is present in the list of nodes running logexporter.
-  # Making it linear would add code complexity without much benefit (as it just takes < 1s for 5k nodes anyway).
-  failed_nodes=()
-  for node in "${NODE_NAMES[@]}"; do
-    if [[ ! "${pods_and_nodes}" =~ "${node}" ]]; then
-      failed_nodes+=("${node}")
-    fi
-  done
-
-  # Collect names of nodes whose logexporter pod didn't succeed.
-  # TODO(shyamjvs): Parallelize the for loop below to make it faster (if needed).
-  logexporter_pods=( $(echo "${pods_and_nodes}" | awk '{print $1}') )
-  logexporter_nodes=( $(echo "${pods_and_nodes}" | awk '{print $2}') )
-  for index in "${!logexporter_pods[@]}"; do
-    pod="${logexporter_pods[$index]}"
-    node="${logexporter_nodes[$index]}"
-    # TODO(shyamjvs): Use a /status endpoint on the pod instead of checking its logs if that's faster.
-    pod_success_log=$(${KUBECTL} get logs ${pod} -n logexporter 2>&1 | grep "Logs successfully uploaded") || true
-    if [[ -z "${pod_success_log}" ]]; then
-      failed_nodes+=("${node}")
-    fi
-  done
-
-  # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
-  "${KUBECTL}" delete namespace logexporter
-  if [[ "${#failed_nodes[@]}" != 0 ]]; then
-    echo -e "Dumping logs through SSH for nodes logexporter failed to succeed on:\n${failed_nodes[@]}"
-    dump_nodes "${failed_nodes[@]}"
-  fi
-}
-
-function main() {
-  setup
-  # Copy master logs to artifacts dir locally (through SSH).
-  echo "Dumping logs from master locally to '${report_dir}'"
-  dump_masters
-  if [[ "${DUMP_ONLY_MASTER_LOGS:-}" == "true" ]]; then
-    echo "Skipping dumping of node logs"
-    return
-  fi
-
-  # Copy logs from nodes to GCS directly or to artifacts dir locally (through SSH).
-  if [[ -n "${gcs_artifacts_dir}" ]]; then
-    echo "Dumping logs from nodes to GCS directly at '${gcs_artifacts_dir}' using logexporter"
-    dump_nodes_with_logexporter
-  else
-    echo "Dumping logs from nodes locally to '${report_dir}'"
-    dump_nodes
-  fi
-}
-
-main
+setup
+echo "Dumping master logs to ${report_dir}"
+dump_masters
+if [[ "${DUMP_ONLY_MASTER_LOGS:-}" != "true" ]]; then
+  echo "Dumping node logs to ${report_dir}"
+  dump_nodes
+else
+  echo "Skipping dumping of node logs"
+fi

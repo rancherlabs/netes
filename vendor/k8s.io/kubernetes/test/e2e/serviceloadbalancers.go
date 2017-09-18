@@ -20,14 +20,16 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/manifest"
+	"k8s.io/kubernetes/test/e2e/generated"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -86,9 +88,7 @@ func (h *haproxyControllerTester) getName() string {
 func (h *haproxyControllerTester) start(namespace string) (err error) {
 
 	// Create a replication controller with the given configuration.
-	framework.Logf("Parsing rc from %v", h.cfg)
-	rc, err := manifest.RcFromManifest(h.cfg)
-	Expect(err).NotTo(HaveOccurred())
+	rc := rcFromManifest(h.cfg)
 	rc.Namespace = namespace
 	rc.Spec.Template.Labels["name"] = rc.Name
 
@@ -164,10 +164,7 @@ func (s *ingManager) getName() string {
 func (s *ingManager) start(namespace string) (err error) {
 	// Create rcs
 	for _, rcPath := range s.rcCfgPaths {
-		framework.Logf("Parsing rc from %v", rcPath)
-		var rc *v1.ReplicationController
-		rc, err = manifest.RcFromManifest(rcPath)
-		Expect(err).NotTo(HaveOccurred())
+		rc := rcFromManifest(rcPath)
 		rc.Namespace = namespace
 		rc.Spec.Template.Labels["name"] = rc.Name
 		rc, err = s.client.Core().ReplicationControllers(rc.Namespace).Create(rc)
@@ -182,10 +179,7 @@ func (s *ingManager) start(namespace string) (err error) {
 	// Note that it's up to the caller to make sure the service actually matches
 	// the pods of the rc.
 	for _, svcPath := range s.svcCfgPaths {
-		framework.Logf("Parsing service from %v", svcPath)
-		var svc *v1.Service
-		svc, err = manifest.SvcFromManifest(svcPath)
-		Expect(err).NotTo(HaveOccurred())
+		svc := svcFromManifest(svcPath)
 		svc.Namespace = namespace
 		svc, err = s.client.Core().Services(svc.Namespace).Create(svc)
 		if err != nil {
@@ -244,3 +238,29 @@ var _ = framework.KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer
 		}
 	})
 })
+
+// rcFromManifest reads a .json/yaml file and returns the rc in it.
+func rcFromManifest(fileName string) *v1.ReplicationController {
+	var controller v1.ReplicationController
+	framework.Logf("Parsing rc from %v", fileName)
+	data := generated.ReadOrDie(fileName)
+
+	json, err := utilyaml.ToJSON(data)
+	Expect(err).NotTo(HaveOccurred())
+
+	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &controller)).NotTo(HaveOccurred())
+	return &controller
+}
+
+// svcFromManifest reads a .json/yaml file and returns the rc in it.
+func svcFromManifest(fileName string) *v1.Service {
+	var svc v1.Service
+	framework.Logf("Parsing service from %v", fileName)
+	data := generated.ReadOrDie(fileName)
+
+	json, err := utilyaml.ToJSON(data)
+	Expect(err).NotTo(HaveOccurred())
+
+	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &svc)).NotTo(HaveOccurred())
+	return &svc
+}

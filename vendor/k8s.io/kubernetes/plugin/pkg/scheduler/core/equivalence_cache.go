@@ -20,8 +20,8 @@ import (
 	"hash/fnv"
 	"sync"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/api/v1"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 
@@ -158,8 +158,7 @@ func (ec *EquivalenceCache) InvalidateAllCachedPredicateItemOfNode(nodeName stri
 	glog.V(5).Infof("Done invalidating all cached predicates on node: %s", nodeName)
 }
 
-// InvalidateCachedPredicateItemForPod marks item of given predicateKeys, of given pod (i.e. equivalenceHash),
-// on the given node as invalid
+// InvalidateCachedPredicateItemForPod marks item of given predicateKeys, of given pod, on the given node as invalid
 func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPod(nodeName string, predicateKeys sets.String, pod *v1.Pod) {
 	if len(predicateKeys) == 0 {
 		return

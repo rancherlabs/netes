@@ -24,12 +24,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -389,7 +388,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 	v1FailInvalidAppArmorPod := defaultV1Pod()
 	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, apparmor.ProfileNamePrefix+"foo")
 	failInvalidAppArmorPod := &api.Pod{}
-	k8s_api_v1.Convert_v1_Pod_To_api_Pod(v1FailInvalidAppArmorPod, failInvalidAppArmorPod, nil)
+	v1.Convert_v1_Pod_To_api_Pod(v1FailInvalidAppArmorPod, failInvalidAppArmorPod, nil)
 
 	failAppArmorPSP := defaultPSP()
 	failAppArmorPSP.Annotations = map[string]string{
@@ -463,7 +462,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		"failHostPortPSP": {
 			pod:           failHostPortPod,
 			psp:           defaultPSP(),
-			expectedError: "Host port 1 is not allowed to be used. Allowed ports: []",
+			expectedError: "Host port 1 is not allowed to be used.  Allowed ports: []",
 		},
 		"failReadOnlyRootFS - nil": {
 			pod:           defaultPod(),
@@ -498,7 +497,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 			continue
 		}
 		if !strings.Contains(errs[0].Error(), v.expectedError) {
-			t.Errorf("%s received unexpected error %v\nexpected: %s", k, errs, v.expectedError)
+			t.Errorf("%s received unexpected error %v", k, errs)
 		}
 	}
 }
@@ -688,7 +687,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	v1AppArmorPod := defaultV1Pod()
 	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, apparmor.ProfileRuntimeDefault)
 	appArmorPod := &api.Pod{}
-	k8s_api_v1.Convert_v1_Pod_To_api_Pod(v1AppArmorPod, appArmorPod, nil)
+	v1.Convert_v1_Pod_To_api_Pod(v1AppArmorPod, appArmorPod, nil)
 
 	privPSP := defaultPSP()
 	privPSP.Spec.Privileged = true

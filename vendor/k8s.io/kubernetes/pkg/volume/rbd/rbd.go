@@ -21,23 +21,18 @@ import (
 	dstrings "strings"
 
 	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-)
-
-var (
-	supportedFeatures = sets.NewString("layering")
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -56,10 +51,8 @@ var _ volume.DeletableVolumePlugin = &rbdPlugin{}
 var _ volume.ProvisionableVolumePlugin = &rbdPlugin{}
 
 const (
-	rbdPluginName   = "kubernetes.io/rbd"
-	secretKeyName   = "key" // key name used in secret
-	rbdImageFormat1 = "1"
-	rbdImageFormat2 = "2"
+	rbdPluginName = "kubernetes.io/rbd"
+	secretKeyName = "key" // key name used in secret
 )
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -274,7 +267,6 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	adminSecretNamespace := "default"
 	secretName := ""
 	secret := ""
-	imageFormat := rbdImageFormat1
 
 	for k, v := range r.options.Parameters {
 		switch dstrings.ToLower(k) {
@@ -295,27 +287,11 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			r.Pool = v
 		case "usersecretname":
 			secretName = v
-		case "imageformat":
-			imageFormat = v
-		case "imagefeatures":
-			arr := dstrings.Split(v, ",")
-			for _, f := range arr {
-				if !supportedFeatures.Has(f) {
-					return nil, fmt.Errorf("invalid feature %q for volume plugin %s, supported features are: %v", f, r.plugin.GetPluginName(), supportedFeatures)
-				} else {
-					r.imageFeatures = append(r.imageFeatures, f)
-				}
-			}
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
 		}
 	}
 	// sanity check
-	if imageFormat != rbdImageFormat1 && imageFormat != rbdImageFormat2 {
-		return nil, fmt.Errorf("invalid ceph imageformat %s, expecting %s or %s",
-			imageFormat, rbdImageFormat1, rbdImageFormat2)
-	}
-	r.imageFormat = imageFormat
 	if adminSecretName == "" {
 		return nil, fmt.Errorf("missing Ceph admin secret name")
 	}
@@ -400,16 +376,14 @@ func (rbd *rbd) GetPath() string {
 type rbdMounter struct {
 	*rbd
 	// capitalized so they can be exported in persistRBD()
-	Mon           []string
-	Id            string
-	Keyring       string
-	Secret        string
-	fsType        string
-	adminSecret   string
-	adminId       string
-	mountOptions  []string
-	imageFormat   string
-	imageFeatures []string
+	Mon          []string
+	Id           string
+	Keyring      string
+	Secret       string
+	fsType       string
+	adminSecret  string
+	adminId      string
+	mountOptions []string
 }
 
 var _ volume.Mounter = &rbdMounter{}

@@ -224,11 +224,6 @@ function create-master-auth {
   cat <<EOF >/etc/gce.conf
 [global]
 EOF
-  if [[ -n "${GCE_API_ENDPOINT:-}" ]]; then
-    cat <<EOF >>/etc/gce.conf
-api-endpoint = ${GCE_API_ENDPOINT}
-EOF
-  fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
@@ -237,11 +232,6 @@ token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
-    if [[ -n "${NETWORK_PROJECT_ID:-}" ]]; then
-      cat <<EOF >>/etc/gce.conf
-network-project-id = ${NETWORK_PROJECT_ID}
-EOF
-    fi
     if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
       cat <<EOF >>/etc/gce.conf
 subnetwork-name = ${NODE_SUBNETWORK}
@@ -993,16 +983,7 @@ function start-kube-apiserver {
 
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
-    container_env="\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
-  fi
-  if [[ -n "${ENABLE_PATCH_CONVERSION_DETECTOR:-}" ]]; then
-    if [[ -n "${container_env}" ]]; then
-      container_env="${container_env}, "
-    fi
-    container_env="\"name\": \"KUBE_PATCH_CONVERSION_DETECTOR\", \"value\": \"${ENABLE_PATCH_CONVERSION_DETECTOR}\""
-  fi
-  if [[ -n "${container_env}" ]]; then
-    container_env="\"env\":[{${container_env}}],"
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
   fi
 
   src_file="${src_dir}/kube-apiserver.manifest"

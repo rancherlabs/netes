@@ -9,9 +9,9 @@ type Account struct {
 
 	ClusterId string `json:"clusterId,omitempty" yaml:"cluster_id,omitempty"`
 
-	Created string `json:"created,omitempty" yaml:"created,omitempty"`
+	ClusterOwner bool `json:"clusterOwner,omitempty" yaml:"cluster_owner,omitempty"`
 
-	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
+	Created string `json:"created,omitempty" yaml:"created,omitempty"`
 
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 

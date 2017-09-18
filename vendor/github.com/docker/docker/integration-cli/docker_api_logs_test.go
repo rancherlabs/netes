@@ -12,7 +12,7 @@ import (
 	"github.com/go-check/check"
 )
 
-func (s *DockerSuite) TestLogsAPIWithStdout(c *check.C) {
+func (s *DockerSuite) TestLogsApiWithStdout(c *check.C) {
 	out, _ := dockerCmd(c, "run", "-d", "-t", "busybox", "/bin/sh", "-c", "while true; do echo hello; sleep 1; done")
 	id := strings.TrimSpace(out)
 	c.Assert(waitRun(id), checker.IsNil)
@@ -51,7 +51,7 @@ func (s *DockerSuite) TestLogsAPIWithStdout(c *check.C) {
 	}
 }
 
-func (s *DockerSuite) TestLogsAPINoStdoutNorStderr(c *check.C) {
+func (s *DockerSuite) TestLogsApiNoStdoutNorStderr(c *check.C) {
 	name := "logs_test"
 	dockerCmd(c, "run", "-d", "-t", "--name", name, "busybox", "/bin/sh")
 
@@ -60,11 +60,13 @@ func (s *DockerSuite) TestLogsAPINoStdoutNorStderr(c *check.C) {
 	c.Assert(err, checker.IsNil)
 
 	expected := "Bad parameters: you must choose at least one stream"
-	c.Assert(getErrorMessage(c, body), checker.Contains, expected)
+	if !bytes.Contains(body, []byte(expected)) {
+		c.Fatalf("Expected %s, got %s", expected, string(body[:]))
+	}
 }
 
 // Regression test for #12704
-func (s *DockerSuite) TestLogsAPIFollowEmptyOutput(c *check.C) {
+func (s *DockerSuite) TestLogsApiFollowEmptyOutput(c *check.C) {
 	name := "logs_test"
 	t0 := time.Now()
 	dockerCmd(c, "run", "-d", "-t", "--name", name, "busybox", "sleep", "10")
@@ -79,7 +81,7 @@ func (s *DockerSuite) TestLogsAPIFollowEmptyOutput(c *check.C) {
 	}
 }
 
-func (s *DockerSuite) TestLogsAPIContainerNotFound(c *check.C) {
+func (s *DockerSuite) TestLogsApiContainerNotFound(c *check.C) {
 	name := "nonExistentContainer"
 	resp, _, err := sockRequestRaw("GET", fmt.Sprintf("/containers/%s/logs?follow=1&stdout=1&stderr=1&tail=all", name), bytes.NewBuffer(nil), "")
 	c.Assert(err, checker.IsNil)

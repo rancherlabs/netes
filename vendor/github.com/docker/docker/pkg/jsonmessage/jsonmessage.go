@@ -13,7 +13,7 @@ import (
 )
 
 // JSONError wraps a concrete Code and Message, `Code` is
-// is an integer error code, `Message` is the error message.
+// is a integer error code, `Message` is the error message.
 type JSONError struct {
 	Code    int    `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
@@ -189,9 +189,13 @@ func DisplayJSONMessagesStream(in io.Reader, out io.Writer, terminalFd uintptr, 
 				if isTerminal {
 					fmt.Fprintf(out, "\n")
 				}
+			} else {
+				diff = len(ids) - line
 			}
-			diff = len(ids) - line
-			if isTerminal && diff > 0 {
+			if isTerminal {
+				// NOTE: this appears to be necessary even if
+				// diff == 0.
+				// <ESC>[{diff}A = move cursor up diff rows
 				fmt.Fprintf(out, "%c[%dA", 27, diff)
 			}
 		} else {
@@ -203,7 +207,10 @@ func DisplayJSONMessagesStream(in io.Reader, out io.Writer, terminalFd uintptr, 
 			ids = make(map[string]int)
 		}
 		err := jm.Display(out, isTerminal)
-		if jm.ID != "" && isTerminal && diff > 0 {
+		if jm.ID != "" && isTerminal {
+			// NOTE: this appears to be necessary even if
+			// diff == 0.
+			// <ESC>[{diff}B = move cursor down diff rows
 			fmt.Fprintf(out, "%c[%dB", 27, diff)
 		}
 		if err != nil {
@@ -211,15 +218,4 @@ func DisplayJSONMessagesStream(in io.Reader, out io.Writer, terminalFd uintptr, 
 		}
 	}
 	return nil
-}
-
-type stream interface {
-	io.Writer
-	FD() uintptr
-	IsTerminal() bool
-}
-
-// DisplayJSONMessagesToStream prints json messages to the output stream
-func DisplayJSONMessagesToStream(in io.Reader, stream stream, auxCallback func(*json.RawMessage)) error {
-	return DisplayJSONMessagesStream(in, stream, stream.FD(), stream.IsTerminal(), auxCallback)
 }

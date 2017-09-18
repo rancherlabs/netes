@@ -49,7 +49,6 @@ type EditTestCase struct {
 	Args             []string `yaml:"args"`
 	Filename         string   `yaml:"filename"`
 	Output           string   `yaml:"outputFormat"`
-	OutputPatch      string   `yaml:"outputPatch"`
 	SaveConfig       string   `yaml:"saveConfig"`
 	Namespace        string   `yaml:"namespace"`
 	ExpectedStdout   []string `yaml:"expectedStdout"`
@@ -117,7 +116,7 @@ func TestEdit(t *testing.T) {
 			if step.StepType != "edit" {
 				t.Fatalf("%s, step %d: expected edit step, got %s %s", name, i, req.Method, req.URL.Path)
 			}
-			if !bytes.Equal(body, expectedInput) {
+			if bytes.Compare(body, expectedInput) != 0 {
 				if updateInputFixtures {
 					// Convenience to allow recapturing the input and persisting it here
 					ioutil.WriteFile(inputFile, body, os.FileMode(0644))
@@ -140,7 +139,7 @@ func TestEdit(t *testing.T) {
 					req.Method, req.URL.Path, req.Header.Get("Content-Type"),
 				)
 			}
-			if !bytes.Equal(body, expectedInput) {
+			if bytes.Compare(body, expectedInput) != 0 {
 				if updateInputFixtures {
 					// Convenience to allow recapturing the input and persisting it here
 					ioutil.WriteFile(inputFile, body, os.FileMode(0644))
@@ -250,9 +249,6 @@ func TestEdit(t *testing.T) {
 		}
 		if len(testcase.Output) > 0 {
 			cmd.Flags().Set("output", testcase.Output)
-		}
-		if len(testcase.OutputPatch) > 0 {
-			cmd.Flags().Set("output-patch", testcase.OutputPatch)
 		}
 		if len(testcase.SaveConfig) > 0 {
 			cmd.Flags().Set("save-config", testcase.SaveConfig)

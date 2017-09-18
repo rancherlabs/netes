@@ -105,12 +105,6 @@ type Config struct {
 	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS" yaml:"cloudProviderRateLimitQPS"`
 	// Rate limit Bucket Size
 	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket" yaml:"cloudProviderRateLimitBucket"`
-
-	// Use instance metadata service where possible
-	UseInstanceMetadata bool `json:"useInstanceMetadata" yaml:"useInstanceMetadata"`
-
-	// Use managed service identity for the virtual machine to access Azure ARM APIs
-	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension"`
 }
 
 // Cloud holds the config and clients
@@ -154,62 +148,62 @@ func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.Private
 	return certificate, rsaPrivateKey, nil
 }
 
-// GetServicePrincipalToken creates a new service principal token based on the configuration
-func GetServicePrincipalToken(config *Config, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
-	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, config.TenantID)
+// newServicePrincipalToken creates a new service principal token based on the configuration
+func newServicePrincipalToken(az *Cloud) (*adal.ServicePrincipalToken, error) {
+	oauthConfig, err := adal.NewOAuthConfig(az.Environment.ActiveDirectoryEndpoint, az.TenantID)
 	if err != nil {
 		return nil, fmt.Errorf("creating the OAuth config: %v", err)
 	}
 
-	if config.UseManagedIdentityExtension {
-		glog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
-		return adal.NewServicePrincipalTokenFromMSI(
-			*oauthConfig,
-			env.ServiceManagementEndpoint)
-	}
-
-	if len(config.AADClientSecret) > 0 {
-		glog.V(2).Infoln("azure: using client_id+client_secret to retrieve access token")
+	if len(az.AADClientSecret) > 0 {
 		return adal.NewServicePrincipalToken(
 			*oauthConfig,
-			config.AADClientID,
-			config.AADClientSecret,
-			env.ServiceManagementEndpoint)
-	}
-
-	if len(config.AADClientCertPath) > 0 && len(config.AADClientCertPassword) > 0 {
-		glog.V(2).Infoln("azure: using jwt client_assertion (client_cert+client_private_key) to retrieve access token")
-		certData, err := ioutil.ReadFile(config.AADClientCertPath)
+			az.AADClientID,
+			az.AADClientSecret,
+			az.Environment.ServiceManagementEndpoint)
+	} else if len(az.AADClientCertPath) > 0 && len(az.AADClientCertPassword) > 0 {
+		certData, err := ioutil.ReadFile(az.AADClientCertPath)
 		if err != nil {
-			return nil, fmt.Errorf("reading the client certificate from file %s: %v", config.AADClientCertPath, err)
+			return nil, fmt.Errorf("reading the client certificate from file %s: %v", az.AADClientCertPath, err)
 		}
-		certificate, privateKey, err := decodePkcs12(certData, config.AADClientCertPassword)
+		certificate, privateKey, err := decodePkcs12(certData, az.AADClientCertPassword)
 		if err != nil {
 			return nil, fmt.Errorf("decoding the client certificate: %v", err)
 		}
 		return adal.NewServicePrincipalTokenFromCertificate(
 			*oauthConfig,
-			config.AADClientID,
+			az.AADClientID,
 			certificate,
 			privateKey,
-			env.ServiceManagementEndpoint)
+			az.Environment.ServiceManagementEndpoint)
+	} else {
+		return nil, fmt.Errorf("No credentials provided for AAD application %s", az.AADClientID)
 	}
-
-	return nil, fmt.Errorf("No credentials provided for AAD application %s", config.AADClientID)
 }
 
 // NewCloud returns a Cloud with initialized clients
 func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
-	config, env, err := ParseConfig(configReader)
+	var az Cloud
+
+	configContents, err := ioutil.ReadAll(configReader)
 	if err != nil {
 		return nil, err
 	}
-	az := Cloud{
-		Config:      *config,
-		Environment: *env,
+	err = yaml.Unmarshal(configContents, &az)
+	if err != nil {
+		return nil, err
 	}
 
-	servicePrincipalToken, err := GetServicePrincipalToken(config, env)
+	if az.Cloud == "" {
+		az.Environment = azure.PublicCloud
+	} else {
+		az.Environment, err = azure.EnvironmentFromName(az.Cloud)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	servicePrincipalToken, err := newServicePrincipalToken(&az)
 	if err != nil {
 		return nil, err
 	}
@@ -322,31 +316,6 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 	return &az, nil
-}
-
-// ParseConfig returns a parsed configuration and azure.Environment for an Azure cloudprovider config file
-func ParseConfig(configReader io.Reader) (*Config, *azure.Environment, error) {
-	var config Config
-
-	configContents, err := ioutil.ReadAll(configReader)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = yaml.Unmarshal(configContents, &config)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var env azure.Environment
-	if config.Cloud == "" {
-		env = azure.PublicCloud
-	} else {
-		env, err = azure.EnvironmentFromName(config.Cloud)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	return &config, &env, nil
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider

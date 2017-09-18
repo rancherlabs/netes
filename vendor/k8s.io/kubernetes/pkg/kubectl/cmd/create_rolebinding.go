@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -77,7 +78,7 @@ func CreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, 
 			ServiceAccounts: cmdutil.GetFlagStringArray(cmd, "serviceaccount"),
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

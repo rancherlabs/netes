@@ -19,6 +19,7 @@ package framework
 import (
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -27,17 +28,22 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	apps "k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/test/e2e/manifest"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/test/e2e/generated"
 )
 
 const (
@@ -66,6 +72,24 @@ func CreateStatefulSetService(name string, labels map[string]string) *v1.Service
 	return headlessService
 }
 
+// StatefulSetFromManifest returns a StatefulSet from a manifest stored in fileName in the Namespace indicated by ns.
+func StatefulSetFromManifest(fileName, ns string) *apps.StatefulSet {
+	var ss apps.StatefulSet
+	Logf("Parsing statefulset from %v", fileName)
+	data := generated.ReadOrDie(fileName)
+	json, err := utilyaml.ToJSON(data)
+	Expect(err).NotTo(HaveOccurred())
+
+	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &ss)).NotTo(HaveOccurred())
+	ss.Namespace = ns
+	if ss.Spec.Selector == nil {
+		ss.Spec.Selector = &metav1.LabelSelector{
+			MatchLabels: ss.Spec.Template.Labels,
+		}
+	}
+	return &ss
+}
+
 // StatefulSetTester is a struct that contains utility methods for testing StatefulSet related functionality. It uses a
 // clientset.Interface to communicate with the API server.
 type StatefulSetTester struct {
@@ -91,21 +115,15 @@ func (s *StatefulSetTester) CreateStatefulSet(manifestPath, ns string) *apps.Sta
 	mkpath := func(file string) string {
 		return filepath.Join(manifestPath, file)
 	}
-
-	Logf("Parsing statefulset from %v", mkpath("statefulset.yaml"))
-	ss, err := manifest.StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
-	Expect(err).NotTo(HaveOccurred())
-	Logf("Parsing service from %v", mkpath("service.yaml"))
-	svc, err := manifest.SvcFromManifest(mkpath("service.yaml"))
-	Expect(err).NotTo(HaveOccurred())
+	ss := StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
+	svcYaml := generated.ReadOrDie(mkpath("service.yaml"))
+	ssYaml := generated.ReadOrDie(mkpath("statefulset.yaml"))
 
 	Logf(fmt.Sprintf("creating " + ss.Name + " service"))
-	_, err = s.c.CoreV1().Services(ns).Create(svc)
-	Expect(err).NotTo(HaveOccurred())
+	RunKubectlOrDieInput(string(svcYaml[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 
 	Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
-	_, err = s.c.AppsV1beta1().StatefulSets(ns).Create(ss)
-	Expect(err).NotTo(HaveOccurred())
+	RunKubectlOrDieInput(string(ssYaml[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 	s.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	return ss
 }
@@ -160,10 +178,10 @@ func (s *StatefulSetTester) CheckHostname(ss *apps.StatefulSet) error {
 func (s *StatefulSetTester) Saturate(ss *apps.StatefulSet) {
 	var i int32
 	for i = 0; i < *(ss.Spec.Replicas); i++ {
-		Logf("Waiting for stateful pod at index " + fmt.Sprintf("%v", i+1) + " to enter Running")
-		s.WaitForRunningAndReady(i+1, ss)
-		Logf("Marking stateful pod at index " + fmt.Sprintf("%v", i) + " healthy")
-		s.SetHealthy(ss)
+		Logf("Waiting for stateful pod at index %v to enter Running", i)
+		s.WaitForRunning(i+1, i, ss)
+		Logf("Resuming stateful pod at index %v", i)
+		s.ResumeNextPod(ss)
 	}
 }
 
@@ -282,18 +300,22 @@ func (s *StatefulSetTester) ConfirmStatefulPodCount(count int, ss *apps.Stateful
 	}
 }
 
-func (s *StatefulSetTester) waitForRunning(numStatefulPods int32, ss *apps.StatefulSet, shouldBeReady bool) {
+// WaitForRunning waits for numPodsRunning in ss to be Running and for the first
+// numPodsReady ordinals to be Ready.
+func (s *StatefulSetTester) WaitForRunning(numPodsRunning, numPodsReady int32, ss *apps.StatefulSet) {
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
 			podList := s.GetPodList(ss)
-			if int32(len(podList.Items)) < numStatefulPods {
-				Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numStatefulPods)
+			s.SortStatefulPods(podList)
+			if int32(len(podList.Items)) < numPodsRunning {
+				Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsRunning)
 				return false, nil
 			}
-			if int32(len(podList.Items)) > numStatefulPods {
-				return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numStatefulPods, len(podList.Items))
+			if int32(len(podList.Items)) > numPodsRunning {
+				return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numPodsRunning, len(podList.Items))
 			}
 			for _, p := range podList.Items {
+				shouldBeReady := getStatefulPodOrdinal(&p) < int(numPodsReady)
 				isReady := podutil.IsPodReady(&p)
 				desiredReadiness := shouldBeReady == isReady
 				Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
@@ -339,7 +361,7 @@ func (s *StatefulSetTester) WaitForStatus(set *apps.StatefulSet) *apps.StatefulS
 
 // WaitForRunningAndReady waits for numStatefulPods in ss to be Running and Ready.
 func (s *StatefulSetTester) WaitForRunningAndReady(numStatefulPods int32, ss *apps.StatefulSet) {
-	s.waitForRunning(numStatefulPods, ss, true)
+	s.WaitForRunning(numStatefulPods, numStatefulPods, ss)
 }
 
 // WaitForPodReady waits for the Pod named podName in set to exist and have a Ready condition.
@@ -473,12 +495,31 @@ func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *apps.StatefulSe
 
 // WaitForRunningAndReady waits for numStatefulPods in ss to be Running and not Ready.
 func (s *StatefulSetTester) WaitForRunningAndNotReady(numStatefulPods int32, ss *apps.StatefulSet) {
-	s.waitForRunning(numStatefulPods, ss, false)
+	s.WaitForRunning(numStatefulPods, 0, ss)
 }
 
-// BreakProbe breaks the readiness probe for Nginx StatefulSet containers in ss.
-func (s *StatefulSetTester) BreakProbe(ss *apps.StatefulSet, probe *v1.Probe) error {
-	path := probe.HTTPGet.Path
+var httpProbe = &v1.Probe{
+	Handler: v1.Handler{
+		HTTPGet: &v1.HTTPGetAction{
+			Path: "/index.html",
+			Port: intstr.IntOrString{IntVal: 80},
+		},
+	},
+	PeriodSeconds:    1,
+	SuccessThreshold: 1,
+	FailureThreshold: 1,
+}
+
+// SetHttpProbe sets the pod template's ReadinessProbe for Nginx StatefulSet containers.
+// This probe can then be controlled with BreakHttpProbe() and RestoreHttpProbe().
+// Note that this cannot be used together with PauseNewPods().
+func (s *StatefulSetTester) SetHttpProbe(ss *apps.StatefulSet) {
+	ss.Spec.Template.Spec.Containers[0].ReadinessProbe = httpProbe
+}
+
+// BreakHttpProbe breaks the readiness probe for Nginx StatefulSet containers in ss.
+func (s *StatefulSetTester) BreakHttpProbe(ss *apps.StatefulSet) error {
+	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
@@ -486,9 +527,9 @@ func (s *StatefulSetTester) BreakProbe(ss *apps.StatefulSet, probe *v1.Probe) er
 	return s.ExecInStatefulPods(ss, cmd)
 }
 
-// BreakProbe breaks the readiness probe for Nginx StatefulSet containers in pod.
-func (s *StatefulSetTester) BreakPodProbe(ss *apps.StatefulSet, pod *v1.Pod, probe *v1.Probe) error {
-	path := probe.HTTPGet.Path
+// BreakPodHttpProbe breaks the readiness probe for Nginx StatefulSet containers in one pod.
+func (s *StatefulSetTester) BreakPodHttpProbe(ss *apps.StatefulSet, pod *v1.Pod) error {
+	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
@@ -498,9 +539,9 @@ func (s *StatefulSetTester) BreakPodProbe(ss *apps.StatefulSet, pod *v1.Pod, pro
 	return err
 }
 
-// RestoreProbe restores the readiness probe for Nginx StatefulSet containers in ss.
-func (s *StatefulSetTester) RestoreProbe(ss *apps.StatefulSet, probe *v1.Probe) error {
-	path := probe.HTTPGet.Path
+// RestoreHttpProbe restores the readiness probe for Nginx StatefulSet containers in ss.
+func (s *StatefulSetTester) RestoreHttpProbe(ss *apps.StatefulSet) error {
+	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
@@ -508,9 +549,9 @@ func (s *StatefulSetTester) RestoreProbe(ss *apps.StatefulSet, probe *v1.Probe) 
 	return s.ExecInStatefulPods(ss, cmd)
 }
 
-// RestoreProbe restores the readiness probe for Nginx StatefulSet containers in pod.
-func (s *StatefulSetTester) RestorePodProbe(ss *apps.StatefulSet, pod *v1.Pod, probe *v1.Probe) error {
-	path := probe.HTTPGet.Path
+// RestorePodHttpProbe restores the readiness probe for Nginx StatefulSet containers in pod.
+func (s *StatefulSetTester) RestorePodHttpProbe(ss *apps.StatefulSet, pod *v1.Pod) error {
+	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
@@ -520,26 +561,50 @@ func (s *StatefulSetTester) RestorePodProbe(ss *apps.StatefulSet, pod *v1.Pod, p
 	return err
 }
 
-// SetHealthy updates the StatefulSet InitAnnotation to true in order to set a StatefulSet Pod to be Running and Ready.
-func (s *StatefulSetTester) SetHealthy(ss *apps.StatefulSet) {
+var pauseProbe = &v1.Probe{
+	Handler: v1.Handler{
+		Exec: &v1.ExecAction{Command: []string{"test", "-f", "/tmp/statefulset-continue"}},
+	},
+	PeriodSeconds:    1,
+	SuccessThreshold: 1,
+	FailureThreshold: 1,
+}
+
+func hasPauseProbe(pod *v1.Pod) bool {
+	probe := pod.Spec.Containers[0].ReadinessProbe
+	return probe != nil && reflect.DeepEqual(probe.Exec.Command, pauseProbe.Exec.Command)
+}
+
+// PauseNewPods adds an always-failing ReadinessProbe to the StatefulSet PodTemplate.
+// This causes all newly-created Pods to stay Unready until they are manually resumed
+// with ResumeNextPod().
+// Note that this cannot be used together with SetHttpProbe().
+func (s *StatefulSetTester) PauseNewPods(ss *apps.StatefulSet) {
+	ss.Spec.Template.Spec.Containers[0].ReadinessProbe = pauseProbe
+}
+
+// ResumeNextPod allows the next Pod in the StatefulSet to continue by removing the ReadinessProbe
+// added by PauseNewPods(), if it's still there.
+// It fails the test if it finds any pods that are not in phase Running,
+// or if it finds more than one paused Pod existing at the same time.
+// This is a no-op if there are no paused pods.
+func (s *StatefulSetTester) ResumeNextPod(ss *apps.StatefulSet) {
 	podList := s.GetPodList(ss)
-	markedHealthyPod := ""
+	resumedPod := ""
 	for _, pod := range podList.Items {
 		if pod.Status.Phase != v1.PodRunning {
-			Failf("Found pod in %v cannot set health", pod.Status.Phase)
+			Failf("Found pod in phase %q, cannot resume", pod.Status.Phase)
 		}
-		if IsStatefulSetPodInitialized(pod) {
+		if podutil.IsPodReady(&pod) || !hasPauseProbe(&pod) {
 			continue
 		}
-		if markedHealthyPod != "" {
-			Failf("Found multiple non-healthy stateful pods: %v and %v", pod.Name, markedHealthyPod)
+		if resumedPod != "" {
+			Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
 		}
-		p, err := UpdatePodWithRetries(s.c, pod.Namespace, pod.Name, func(update *v1.Pod) {
-			update.Annotations[apps.StatefulSetInitAnnotation] = "true"
-		})
+		_, err := RunHostCmd(pod.Namespace, pod.Name, "touch /tmp/statefulset-continue")
 		ExpectNoError(err)
-		Logf("Set annotation %v to %v on pod %v", apps.StatefulSetInitAnnotation, p.Annotations[apps.StatefulSetInitAnnotation], pod.Name)
-		markedHealthyPod = pod.Name
+		Logf("Resumed pod %v", pod.Name)
+		resumedPod = pod.Name
 	}
 }
 
@@ -682,19 +747,6 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	}
 }
 
-// IsStatefulSetPodInitialized returns true if pod's StatefulSetInitAnnotation exists and is set to true.
-func IsStatefulSetPodInitialized(pod v1.Pod) bool {
-	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
-	if !ok {
-		return false
-	}
-	inited, err := strconv.ParseBool(initialized)
-	if err != nil {
-		Failf("Couldn't parse statefulset init annotations %v", initialized)
-	}
-	return inited
-}
-
 // NewStatefulSetPVC returns a PersistentVolumeClaim named name, for testing StatefulSets.
 func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
@@ -776,11 +828,6 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 	}
 }
 
-// SetStatefulSetInitializedAnnotation sets teh StatefulSetInitAnnotation to value.
-func SetStatefulSetInitializedAnnotation(ss *apps.StatefulSet, value string) {
-	ss.Spec.Template.ObjectMeta.Annotations["pod.alpha.kubernetes.io/initialized"] = value
-}
-
 var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
 func getStatefulPodOrdinal(pod *v1.Pod) int {
@@ -807,28 +854,4 @@ func (sp statefulPodsByOrdinal) Swap(i, j int) {
 
 func (sp statefulPodsByOrdinal) Less(i, j int) bool {
 	return getStatefulPodOrdinal(&sp[i]) < getStatefulPodOrdinal(&sp[j])
-}
-
-type updateStatefulSetFunc func(*apps.StatefulSet)
-
-func UpdateStatefulSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *apps.StatefulSet, err error) {
-	statefulSets := c.Apps().StatefulSets(namespace)
-	var updateErr error
-	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if statefulSet, err = statefulSets.Get(name, metav1.GetOptions{}); err != nil {
-			return false, err
-		}
-		// Apply the update, then attempt to push it to the apiserver.
-		applyUpdate(statefulSet)
-		if statefulSet, err = statefulSets.Update(statefulSet); err == nil {
-			Logf("Updating stateful set %s", name)
-			return true, nil
-		}
-		updateErr = err
-		return false, nil
-	})
-	if pollErr == wait.ErrWaitTimeout {
-		pollErr = fmt.Errorf("couldn't apply the provided updated to stateful set %q: %v", name, updateErr)
-	}
-	return statefulSet, pollErr
 }

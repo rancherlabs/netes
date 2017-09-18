@@ -239,10 +239,13 @@ function append_or_replace_prefixed_line {
   local -r file="${1:-}"
   local -r prefix="${2:-}"
   local -r suffix="${3:-}"
+  local -r dirname="$(dirname ${file})"
+  local -r tmpfile="$(mktemp -t filtered.XXXX --tmpdir=${dirname})"
 
   touch "${file}"
-  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
-  echo "${prefix}${suffix}" >> "${file}"
+  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${tmpfile}"
+  echo "${prefix}${suffix}" >> "${tmpfile}"
+  mv "${tmpfile}" "${file}"
 }
 
 function create-node-pki {
@@ -324,20 +327,17 @@ function create-master-pki {
   ln -sf "${APISERVER_SERVER_KEY_PATH}" /etc/srv/kubernetes/server.key
   ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.cert
 
+  AGGREGATOR_CA_KEY_PATH="${pki_dir}/aggr_ca.key"
+  echo "${AGGREGATOR_CA_KEY:-}" | base64 --decode > "${AGGREGATOR_CA_KEY_PATH}"
 
-  if [[ ! -z "${REQUESTHEADER_CA_CERT:-}" ]]; then
-    AGGREGATOR_CA_KEY_PATH="${pki_dir}/aggr_ca.key"
-    echo "${AGGREGATOR_CA_KEY}" | base64 --decode > "${AGGREGATOR_CA_KEY_PATH}"
+  REQUESTHEADER_CA_CERT_PATH="${pki_dir}/aggr_ca.crt"
+  echo "${REQUESTHEADER_CA_CERT:-}" | base64 --decode > "${REQUESTHEADER_CA_CERT_PATH}"
 
-    REQUESTHEADER_CA_CERT_PATH="${pki_dir}/aggr_ca.crt"
-    echo "${REQUESTHEADER_CA_CERT}" | base64 --decode > "${REQUESTHEADER_CA_CERT_PATH}"
+  PROXY_CLIENT_KEY_PATH="${pki_dir}/proxy_client.key"
+  echo "${PROXY_CLIENT_KEY:-}" | base64 --decode > "${PROXY_CLIENT_KEY_PATH}"
 
-    PROXY_CLIENT_KEY_PATH="${pki_dir}/proxy_client.key"
-    echo "${PROXY_CLIENT_KEY}" | base64 --decode > "${PROXY_CLIENT_KEY_PATH}"
-
-    PROXY_CLIENT_CERT_PATH="${pki_dir}/proxy_client.crt"
-    echo "${PROXY_CLIENT_CERT}" | base64 --decode > "${PROXY_CLIENT_CERT_PATH}"
-  fi
+  PROXY_CLIENT_CERT_PATH="${pki_dir}/proxy_client.crt"
+  echo "${PROXY_CLIENT_CERT:-}" | base64 --decode > "${PROXY_CLIENT_CERT_PATH}"
 }
 
 # After the first boot and on upgrade, these files exist on the master-pd
@@ -359,7 +359,11 @@ function create-master-auth {
     fi
     append_or_replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER},"      "admin,system:masters"
   fi
+
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
+  if [[ -e "${known_tokens_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
+    rm "${known_tokens_csv}"
+  fi
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
   fi
@@ -368,6 +372,9 @@ function create-master-auth {
   fi
   if [[ -n "${KUBE_SCHEDULER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
+  fi
+  if [[ -n "${KUBELET_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "kubelet,uid:kubelet,system:nodes"
   fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
@@ -379,11 +386,6 @@ function create-master-auth {
   cat <<EOF >/etc/gce.conf
 [global]
 EOF
-  if [[ -n "${GCE_API_ENDPOINT:-}" ]]; then
-    cat <<EOF >>/etc/gce.conf
-api-endpoint = ${GCE_API_ENDPOINT}
-EOF
-  fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
@@ -392,11 +394,6 @@ token-body = ${TOKEN_BODY}
 project-id = ${PROJECT_ID}
 network-name = ${NODE_NETWORK}
 EOF
-    if [[ -n "${NETWORK_PROJECT_ID:-}" ]]; then
-        cat <<EOF >>/etc/gce.conf
-network-project-id = ${NETWORK_PROJECT_ID}
-EOF
-    fi
     if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
       cat <<EOF >>/etc/gce.conf
 subnetwork-name = ${NODE_SUBNETWORK}
@@ -997,6 +994,8 @@ function start-node-problem-detector {
   flags+=" --logtostderr"
   flags+=" --system-log-monitors=${km_config},${dm_config}"
   flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
+  local -r npd_port=${NODE_PROBLEM_DETECTOR_PORT:-20256}
+  flags+=" --port=${npd_port}"
 
   # Write the systemd service file for node problem detector.
   cat <<EOF >/etc/systemd/system/node-problem-detector.service
@@ -1235,7 +1234,7 @@ function start-kube-apiserver {
   params+=" --secure-port=443"
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
-  if [[ -s "${REQUESTHEADER_CA_CERT_PATH:-}" ]]; then
+  if [[ ! -z "${REQUESTHEADER_CA_CERT:-}" ]]; then
     params+=" --requestheader-client-ca-file=${REQUESTHEADER_CA_CERT_PATH}"
     params+=" --requestheader-allowed-names=aggregator"
     params+=" --requestheader-extra-headers-prefix=X-Remote-Extra-"
@@ -1413,16 +1412,7 @@ function start-kube-apiserver {
 
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
-    container_env="\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
-  fi
-  if [[ -n "${ENABLE_PATCH_CONVERSION_DETECTOR:-}" ]]; then
-    if [[ -n "${container_env}" ]]; then
-      container_env="${container_env}, "
-    fi
-    container_env="\"name\": \"KUBE_PATCH_CONVERSION_DETECTOR\", \"value\": \"${ENABLE_PATCH_CONVERSION_DETECTOR}\""
-  fi
-  if [[ -n "${container_env}" ]]; then
-    container_env="\"env\":[{${container_env}}],"
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
   fi
 
   if [[ -n "${ENCRYPTION_PROVIDER_CONFIG:-}" ]]; then
@@ -1728,7 +1718,7 @@ function start-kube-addons {
     sed -i -e "s@__CALICO_TYPHA_CPU__@$(get-calico-typha-cpu)@g" "${typha_dep_file}"
     sed -i -e "s@__CALICO_TYPHA_REPLICAS__@$(get-calico-typha-replicas)@g" "${typha_dep_file}"
   else
-    # If not configured to use Calico, the set the typha replica count to 0, but only if the
+    # If not configured to use Calico, the set the typha replica count to 0, but only if the 
     # addon is present.
     local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
     if [[ -e $typha_dep_file ]]; then

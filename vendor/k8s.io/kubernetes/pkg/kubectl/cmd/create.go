@@ -19,7 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"runtime"
+	gruntime "runtime"
 
 	"github.com/spf13/cobra"
 
@@ -39,12 +39,12 @@ type CreateOptions struct {
 }
 
 var (
-	createLong = templates.LongDesc(i18n.T(`
-		Create a resource from a file or from stdin.
+	create_long = templates.LongDesc(i18n.T(`
+		Create a resource by filename or stdin.
 
 		JSON and YAML formats are accepted.`))
 
-	createExample = templates.Examples(i18n.T(`
+	create_example = templates.Examples(i18n.T(`
 		# Create a pod using the data in pod.json.
 		kubectl create -f ./pod.json
 
@@ -60,11 +60,11 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "create -f FILENAME",
-		Short:   i18n.T("Create a resource from a file or from stdin."),
-		Long:    createLong,
-		Example: createExample,
+		Short:   i18n.T("Create a resource by filename or stdin"),
+		Long:    create_long,
+		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if cmdutil.IsFilenameSliceEmpty(options.FilenameOptions.Filenames) {
+			if cmdutil.IsFilenameEmpty(options.FilenameOptions.Filenames) {
 				defaultRunFunc := cmdutil.DefaultSubCommandRun(errOut)
 				defaultRunFunc(cmd, args)
 				return
@@ -80,8 +80,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&options.EditBeforeCreate, "edit", false, "Edit the API resource before creating")
-	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows",
-		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
+	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Only relevant if --edit=true. Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
@@ -106,7 +105,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 func ValidateArgs(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+		return cmdutil.UsageError(cmd, "Unexpected args: %v", args)
 	}
 	return nil
 }
@@ -229,7 +228,7 @@ func createAndRefresh(info *resource.Info) error {
 // NameFromCommandArgs is a utility function for commands that assume the first argument is a resource name
 func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
 	if len(args) == 0 {
-		return "", cmdutil.UsageErrorf(cmd, "NAME is required")
+		return "", cmdutil.UsageError(cmd, "NAME is required")
 	}
 	return args[0], nil
 }
@@ -241,7 +240,8 @@ type CreateSubcommandOptions struct {
 	// StructuredGenerator is the resource generator for the object being created
 	StructuredGenerator kubectl.StructuredGenerator
 	// DryRun is true if the command should be simulated but not run against the server
-	DryRun       bool
+	DryRun bool
+	// OutputFormat
 	OutputFormat string
 }
 

@@ -125,7 +125,7 @@ func TestGetPodNetworkStatus(t *testing.T) {
 	}
 }
 
-// TestTeardownCallsShaper tests that a `TearDown` call does call
+// TestTeardownBeforeSetUp tests that a `TearDown` call does call
 // `shaper.Reset`
 func TestTeardownCallsShaper(t *testing.T) {
 	fexec := &exec.FakeExec{
@@ -232,61 +232,37 @@ func TestGenerateMacAddress(t *testing.T) {
 // TestInvocationWithoutRuntime invokes the plugin without a runtime.
 // This is how kubenet is invoked from the cri.
 func TestTearDownWithoutRuntime(t *testing.T) {
-	testCases := []struct {
-		podCIDR         string
-		ip              string
-		expectedGateway string
-	}{
-		{
-			podCIDR:         "10.0.0.1/24",
-			ip:              "10.0.0.1",
-			expectedGateway: "10.0.0.1",
-		},
-		{
-			podCIDR:         "2001:beef::1/48",
-			ip:              "2001:beef::1",
-			expectedGateway: "2001:beef::1",
+	fhost := nettest.NewFakeHost(nil)
+	fhost.Legacy = false
+	fhost.Runtime = nil
+	mockcni := &mock_cni.MockCNI{}
+
+	fexec := &exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{},
+		LookPathFunc: func(file string) (string, error) {
+			return fmt.Sprintf("/fake-bin/%s", file), nil
 		},
 	}
-	for _, tc := range testCases {
-		fhost := nettest.NewFakeHost(nil)
-		fhost.Legacy = false
-		fhost.Runtime = nil
-		mockcni := &mock_cni.MockCNI{}
 
-		fexec := &exec.FakeExec{
-			CommandScript: []exec.FakeCommandAction{},
-			LookPathFunc: func(file string) (string, error) {
-				return fmt.Sprintf("/fake-bin/%s", file), nil
-			},
-		}
+	kubenet := newFakeKubenetPlugin(map[kubecontainer.ContainerID]string{}, fexec, fhost)
+	kubenet.cniConfig = mockcni
+	kubenet.iptables = ipttest.NewFake()
 
-		kubenet := newFakeKubenetPlugin(map[kubecontainer.ContainerID]string{}, fexec, fhost)
-		kubenet.cniConfig = mockcni
-		kubenet.iptables = ipttest.NewFake()
+	details := make(map[string]interface{})
+	details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = "10.0.0.1/24"
+	kubenet.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
 
-		details := make(map[string]interface{})
-		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = tc.podCIDR
-		kubenet.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
+	existingContainerID := kubecontainer.BuildContainerID("docker", "123")
+	kubenet.podIPs[existingContainerID] = "10.0.0.1"
 
-		if kubenet.gateway.String() != tc.expectedGateway {
-			t.Errorf("generated gateway: %q, expecting: %q", kubenet.gateway.String(), tc.expectedGateway)
-		}
-		if kubenet.podCidr != tc.podCIDR {
-			t.Errorf("generated podCidr: %q, expecting: %q", kubenet.podCidr, tc.podCIDR)
-		}
-		existingContainerID := kubecontainer.BuildContainerID("docker", "123")
-		kubenet.podIPs[existingContainerID] = tc.ip
+	mockcni.On("DelNetwork", mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
-		mockcni.On("DelNetwork", mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
-
-		if err := kubenet.TearDownPod("namespace", "name", existingContainerID); err != nil {
-			t.Fatalf("Unexpected error in TearDownPod: %v", err)
-		}
-		// Assert that the CNI DelNetwork made it through and we didn't crash
-		// without a runtime.
-		mockcni.AssertExpectations(t)
+	if err := kubenet.TearDownPod("namespace", "name", existingContainerID); err != nil {
+		t.Fatalf("Unexpected error in TearDownPod: %v", err)
 	}
+	// Assert that the CNI DelNetwork made it through and we didn't crash
+	// without a runtime.
+	mockcni.AssertExpectations(t)
 }
 
 //TODO: add unit test for each implementation of network plugin interface

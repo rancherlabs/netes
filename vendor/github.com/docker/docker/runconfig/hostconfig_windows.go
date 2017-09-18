@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/sysinfo"
+	"github.com/docker/engine-api/types/container"
 )
 
 // DefaultDaemonNetworkMode returns the default network stack the daemon should
@@ -42,27 +41,6 @@ func ValidateIsolation(hc *container.HostConfig) error {
 	}
 	if !hc.Isolation.IsValid() {
 		return fmt.Errorf("invalid --isolation: %q. Windows supports 'default', 'process', or 'hyperv'", hc.Isolation)
-	}
-	return nil
-}
-
-// ValidateQoS performs platform specific validation of the Qos settings
-func ValidateQoS(hc *container.HostConfig) error {
-	return nil
-}
-
-// ValidateResources performs platform specific validation of the resource settings
-func ValidateResources(hc *container.HostConfig, si *sysinfo.SysInfo) error {
-	// We may not be passed a host config, such as in the case of docker commit
-	if hc == nil {
-		return nil
-	}
-
-	if hc.Resources.CPURealtimePeriod != 0 {
-		return fmt.Errorf("invalid --cpu-rt-period: Windows does not support this feature")
-	}
-	if hc.Resources.CPURealtimeRuntime != 0 {
-		return fmt.Errorf("invalid --cpu-rt-runtime: Windows does not support this feature")
 	}
 	return nil
 }

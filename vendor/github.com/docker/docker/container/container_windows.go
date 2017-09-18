@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	containertypes "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/utils"
+	"github.com/docker/docker/volume"
+	containertypes "github.com/docker/engine-api/types/container"
 )
 
 // Container holds fields specific to the Windows implementation. See
@@ -16,6 +16,9 @@ import (
 type Container struct {
 	CommonContainer
 
+	HostnamePath   string
+	HostsPath      string
+	ResolvConfPath string
 	// Fields below here are platform specific.
 }
 
@@ -26,14 +29,12 @@ type ExitStatus struct {
 }
 
 // CreateDaemonEnvironment creates a new environment variable slice for this container.
-func (container *Container) CreateDaemonEnvironment(_ bool, linkedEnv []string) []string {
-	// because the env on the container can override certain default values
-	// we need to replace the 'env' keys where they match and append anything
-	// else.
-	return utils.ReplaceOrAppendEnvValues(linkedEnv, container.Config.Env)
+func (container *Container) CreateDaemonEnvironment(linkedEnv []string) []string {
+	// On Windows, nothing to link. Just return the container environment.
+	return container.Config.Env
 }
 
-// UnmountIpcMounts unmounts Ipc related mounts.
+// UnmountIpcMounts unmount Ipc related mounts.
 // This is a NOOP on windows.
 func (container *Container) UnmountIpcMounts(unmount func(pth string) error) {
 }
@@ -43,27 +44,14 @@ func (container *Container) IpcMounts() []Mount {
 	return nil
 }
 
-// SecretMount returns the mount for the secret path
-func (container *Container) SecretMount() *Mount {
+// UnmountVolumes explicitly unmounts volumes from the container.
+func (container *Container) UnmountVolumes(forceSyscall bool, volumeEventLog func(name, action string, attributes map[string]string)) error {
 	return nil
-}
-
-// UnmountSecrets unmounts the fs for secrets
-func (container *Container) UnmountSecrets() error {
-	return nil
-}
-
-// DetachAndUnmount unmounts all volumes.
-// On Windows it only delegates to `UnmountVolumes` since there is nothing to
-// force unmount.
-func (container *Container) DetachAndUnmount(volumeEventLog func(name, action string, attributes map[string]string)) error {
-	return container.UnmountVolumes(volumeEventLog)
 }
 
 // TmpfsMounts returns the list of tmpfs mounts
-func (container *Container) TmpfsMounts() ([]Mount, error) {
-	var mounts []Mount
-	return mounts, nil
+func (container *Container) TmpfsMounts() []Mount {
+	return nil
 }
 
 // UpdateContainer updates configuration of a container
@@ -80,12 +68,16 @@ func (container *Container) UpdateContainer(hostConfig *containertypes.HostConfi
 	}
 	// update HostConfig of container
 	if hostConfig.RestartPolicy.Name != "" {
-		if container.HostConfig.AutoRemove && !hostConfig.RestartPolicy.IsNone() {
-			return fmt.Errorf("Restart policy cannot be updated because AutoRemove is enabled for the container")
-		}
 		container.HostConfig.RestartPolicy = hostConfig.RestartPolicy
 	}
 	return nil
+}
+
+// appendNetworkMounts appends any network mounts to the array of mount points passed in.
+// Windows does not support network mounts (not to be confused with SMB network mounts), so
+// this is a no-op.
+func appendNetworkMounts(container *Container, volumeMounts []volume.MountPoint) ([]volume.MountPoint, error) {
+	return volumeMounts, nil
 }
 
 // cleanResourcePath cleans a resource path by removing C:\ syntax, and prepares
@@ -105,7 +97,9 @@ func (container *Container) BuildHostnameFile() error {
 	return nil
 }
 
-// EnableServiceDiscoveryOnDefaultNetwork Enable service discovery on default network
-func (container *Container) EnableServiceDiscoveryOnDefaultNetwork() bool {
-	return true
+// canMountFS determines if the file system for the container
+// can be mounted locally. In the case of Windows, this is not possible
+// for Hyper-V containers during WORKDIR execution for example.
+func (container *Container) canMountFS() bool {
+	return !containertypes.Isolation.IsHyperV(container.HostConfig.Isolation)
 }

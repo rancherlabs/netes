@@ -28,7 +28,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,6 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/i18n"
@@ -168,11 +168,12 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if req.URL.Path == "/namespaces/test/replicationcontrollers" {
 					return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, rc)}, nil
+				} else {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
+					}, nil
 				}
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
-				}, nil
 			}),
 		}
 		tf.Namespace = "test"
@@ -180,7 +181,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 		cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 		cmd.Flags().Set("image", "nginx")
 		cmd.Flags().Set("generator", "run/v1")
-		err := RunRun(f, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
+		err := Run(f, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
 		if test.expectError && err == nil {
 			t.Errorf("unexpected non-error (%s)", test.name)
 		}
@@ -296,12 +297,14 @@ func TestGenerateService(t *testing.T) {
 					body := objBody(codec, &test.service)
 					data, err := ioutil.ReadAll(req.Body)
 					if err != nil {
-						t.Fatalf("unexpected error: %v", err)
+						t.Errorf("unexpected error: %v", err)
+						t.FailNow()
 					}
 					defer req.Body.Close()
 					svc := &api.Service{}
 					if err := runtime.DecodeInto(codec, data, svc); err != nil {
-						t.Fatalf("unexpected error: %v", err)
+						t.Errorf("unexpected error: %v", err)
+						t.FailNow()
 					}
 					// Copy things that are defaulted by the system
 					test.service.Annotations = svc.Annotations
@@ -334,7 +337,7 @@ func TestGenerateService(t *testing.T) {
 		}
 
 		buff := &bytes.Buffer{}
-		_, err := generateService(f, cmd, test.args, test.serviceGenerator, test.params, "namespace", buff)
+		err := generateService(f, cmd, test.args, test.serviceGenerator, test.params, "namespace", buff)
 		if test.expectErr {
 			if err == nil {
 				t.Error("unexpected non-error")
@@ -435,7 +438,7 @@ func TestRunValidations(t *testing.T) {
 		for flagName, flagValue := range test.flags {
 			cmd.Flags().Set(flagName, flagValue)
 		}
-		err := RunRun(f, inBuf, outBuf, errBuf, cmd, test.args, cmd.ArgsLenAtDash())
+		err := Run(f, inBuf, outBuf, errBuf, cmd, test.args, cmd.ArgsLenAtDash())
 		if err != nil && len(test.expectedErr) > 0 {
 			if !strings.Contains(err.Error(), test.expectedErr) {
 				t.Errorf("unexpected error: %v", err)

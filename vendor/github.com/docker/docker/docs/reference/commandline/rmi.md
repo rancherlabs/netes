@@ -1,30 +1,22 @@
----
-title: "rmi"
-description: "The rmi command description and usage"
-keywords: "remove, image, Docker"
----
-
-<!-- This file is maintained within the docker/docker Github
-     repository at https://github.com/docker/docker/. Make all
-     pull requests against that repo. If you see this file in
-     another repository, consider it read-only there, as it will
-     periodically be overwritten by the definitive file. Pull
-     requests which include edits to this file in other repositories
-     will be rejected.
--->
+<!--[metadata]>
++++
+title = "rmi"
+description = "The rmi command description and usage"
+keywords = ["remove, image, Docker"]
+[menu.main]
+parent = "smn_cli"
++++
+<![end-metadata]-->
 
 # rmi
 
-```markdown
-Usage:  docker rmi [OPTIONS] IMAGE [IMAGE...]
+    Usage: docker rmi [OPTIONS] IMAGE [IMAGE...]
 
-Remove one or more images
+    Remove one or more images
 
-Options:
-  -f, --force      Force removal of the image
-      --help       Print usage
-      --no-prune   Do not delete untagged parents
-```
+      -f, --force          Force removal of the image
+      --help               Print usage
+      --no-prune           Do not delete untagged parents
 
 You can remove an image using its short or long ID, its tag, or its digest. If
 an image has one or more tag referencing it, you must remove all of them before

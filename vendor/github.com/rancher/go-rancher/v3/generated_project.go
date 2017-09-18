@@ -7,13 +7,11 @@ const (
 type Project struct {
 	Resource
 
-	AllowSystemRole bool `json:"allowSystemRole,omitempty" yaml:"allow_system_role,omitempty"`
-
 	ClusterId string `json:"clusterId,omitempty" yaml:"cluster_id,omitempty"`
 
-	Created string `json:"created,omitempty" yaml:"created,omitempty"`
+	ClusterOwner bool `json:"clusterOwner,omitempty" yaml:"cluster_owner,omitempty"`
 
-	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
+	Created string `json:"created,omitempty" yaml:"created,omitempty"`
 
 	DefaultNetworkId string `json:"defaultNetworkId,omitempty" yaml:"default_network_id,omitempty"`
 

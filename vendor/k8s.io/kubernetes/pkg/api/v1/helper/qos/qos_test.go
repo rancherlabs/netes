@@ -19,12 +19,11 @@ package qos
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper/qos"
-	k8sv1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestGetPodQOS(t *testing.T) {
@@ -138,7 +137,7 @@ func TestGetPodQOS(t *testing.T) {
 
 		// Convert v1.Pod to api.Pod, and then check against `api.helper.GetPodQOS`.
 		pod := api.Pod{}
-		k8sv1.Convert_v1_Pod_To_api_Pod(testCase.pod, &pod, nil)
+		v1.Convert_v1_Pod_To_api_Pod(testCase.pod, &pod, nil)
 
 		if actual := qos.GetPodQOS(&pod); api.PodQOSClass(testCase.expected) != actual {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)

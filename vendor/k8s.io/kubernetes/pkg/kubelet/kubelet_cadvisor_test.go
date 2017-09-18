@@ -30,7 +30,7 @@ import (
 )
 
 func TestGetContainerInfo(t *testing.T) {
-	cadvisorAPIFailure := fmt.Errorf("cAdvisor failure")
+	cadvisorApiFailure := fmt.Errorf("cAdvisor failure")
 	runtimeError := fmt.Errorf("List containers error")
 	tests := []struct {
 		name                      string
@@ -40,7 +40,7 @@ func TestGetContainerInfo(t *testing.T) {
 		runtimeError              error
 		podList                   []*kubecontainertest.FakePod
 		requestedPodFullName      string
-		requestedPodUID           types.UID
+		requestedPodUid           types.UID
 		requestedContainerName    string
 		expectDockerContainerCall bool
 		mockError                 error
@@ -73,7 +73,7 @@ func TestGetContainerInfo(t *testing.T) {
 				},
 			},
 			requestedPodFullName:      "qux_ns",
-			requestedPodUID:           "",
+			requestedPodUid:           "",
 			requestedContainerName:    "foo",
 			expectDockerContainerCall: true,
 			mockError:                 nil,
@@ -102,11 +102,11 @@ func TestGetContainerInfo(t *testing.T) {
 				},
 			},
 			requestedPodFullName:      "qux_ns",
-			requestedPodUID:           "uuid",
+			requestedPodUid:           "uuid",
 			requestedContainerName:    "foo",
 			expectDockerContainerCall: true,
-			mockError:                 cadvisorAPIFailure,
-			expectedError:             cadvisorAPIFailure,
+			mockError:                 cadvisorApiFailure,
+			expectedError:             cadvisorApiFailure,
 			expectStats:               false,
 		},
 		{
@@ -117,7 +117,7 @@ func TestGetContainerInfo(t *testing.T) {
 			runtimeError:              nil,
 			podList:                   []*kubecontainertest.FakePod{},
 			requestedPodFullName:      "qux",
-			requestedPodUID:           "",
+			requestedPodUid:           "",
 			requestedContainerName:    "foo",
 			expectDockerContainerCall: false,
 			mockError:                 nil,
@@ -132,7 +132,7 @@ func TestGetContainerInfo(t *testing.T) {
 			runtimeError:           runtimeError,
 			podList:                []*kubecontainertest.FakePod{},
 			requestedPodFullName:   "qux",
-			requestedPodUID:        "",
+			requestedPodUid:        "",
 			requestedContainerName: "foo",
 			mockError:              nil,
 			expectedError:          runtimeError,
@@ -146,7 +146,7 @@ func TestGetContainerInfo(t *testing.T) {
 			runtimeError:           nil,
 			podList:                []*kubecontainertest.FakePod{},
 			requestedPodFullName:   "qux_ns",
-			requestedPodUID:        "",
+			requestedPodUid:        "",
 			requestedContainerName: "foo",
 			mockError:              nil,
 			expectedError:          kubecontainer.ErrContainerNotFound,
@@ -174,7 +174,7 @@ func TestGetContainerInfo(t *testing.T) {
 				},
 			},
 			requestedPodFullName:   "qux_ns",
-			requestedPodUID:        "",
+			requestedPodUid:        "",
 			requestedContainerName: "foo",
 			mockError:              nil,
 			expectedError:          kubecontainer.ErrContainerNotFound,
@@ -195,7 +195,7 @@ func TestGetContainerInfo(t *testing.T) {
 		fakeRuntime.Err = tc.runtimeError
 		fakeRuntime.PodList = tc.podList
 
-		stats, err := kubelet.GetContainerInfo(tc.requestedPodFullName, tc.requestedPodUID, tc.requestedContainerName, cadvisorReq)
+		stats, err := kubelet.GetContainerInfo(tc.requestedPodFullName, tc.requestedPodUid, tc.requestedContainerName, cadvisorReq)
 		assert.Equal(t, tc.expectedError, err)
 
 		if tc.expectStats {

@@ -29,10 +29,10 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/version"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
@@ -56,7 +56,7 @@ type Config struct {
 	APIPath string
 	// Prefix is the sub path of the server. If not specified, the client will set
 	// a default value.  Use "/" to indicate the server root should be used
-	//Prefix string
+	Prefix string
 
 	// ContentConfig contains settings that affect how objects are transformed when
 	// sent to the server.
@@ -126,7 +126,6 @@ type ImpersonationConfig struct {
 	Extra map[string][]string
 }
 
-// +k8s:deepcopy-gen=true
 // TLSClientConfig contains settings to enable transport layer security
 type TLSClientConfig struct {
 	// Server should be accessed without verifying the TLS certificate. For testing only.
@@ -398,7 +397,7 @@ func AnonymousClientConfig(config *Config) *Config {
 	return &Config{
 		Host:          config.Host,
 		APIPath:       config.APIPath,
-		//Prefix:        config.Prefix,
+		Prefix:        config.Prefix,
 		ContentConfig: config.ContentConfig,
 		TLSClientConfig: TLSClientConfig{
 			Insecure:   config.Insecure,

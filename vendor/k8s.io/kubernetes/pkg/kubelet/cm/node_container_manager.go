@@ -25,10 +25,10 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -217,6 +217,10 @@ func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.Res
 			memoryCapacity := capacity[v1.ResourceMemory]
 			value := evictionapi.GetThresholdQuantity(threshold.Value, &memoryCapacity)
 			ret[v1.ResourceMemory] = *value
+		case evictionapi.SignalNodeFsAvailable:
+			storageCapacity := capacity[v1.ResourceStorageScratch]
+			value := evictionapi.GetThresholdQuantity(threshold.Value, &storageCapacity)
+			ret[v1.ResourceStorageScratch] = *value
 		}
 	}
 	return ret

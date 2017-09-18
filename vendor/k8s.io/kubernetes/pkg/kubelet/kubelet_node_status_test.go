@@ -30,7 +30,6 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -41,8 +40,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -954,7 +954,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		kubelet.registerWithAPIServer()
+		kubelet.registerWithApiServer()
 		done <- struct{}{}
 	}()
 	select {
@@ -1113,7 +1113,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			return notImplemented(action)
 		})
 
-		result := kubelet.tryRegisterWithAPIServer(tc.newNode)
+		result := kubelet.tryRegisterWithApiServer(tc.newNode)
 		require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
 
 		actions := kubeClient.Actions()

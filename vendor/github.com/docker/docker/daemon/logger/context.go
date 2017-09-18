@@ -20,7 +20,6 @@ type Context struct {
 	ContainerEnv        []string
 	ContainerLabels     map[string]string
 	LogPath             string
-	DaemonName          string
 }
 
 // ExtraAttributes returns the user-defined extra attributes (labels,
@@ -75,7 +74,9 @@ func (ctx *Context) Hostname() (string, error) {
 // arguments.
 func (ctx *Context) Command() string {
 	terms := []string{ctx.ContainerEntrypoint}
-	terms = append(terms, ctx.ContainerArgs...)
+	for _, arg := range ctx.ContainerArgs {
+		terms = append(terms, arg)
+	}
 	command := strings.Join(terms, " ")
 	return command
 }

@@ -38,3 +38,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion)
 	return nil
 }
+
+func (obj *TestType) GetObjectKind() schema.ObjectKind     { return &obj.TypeMeta }
+func (obj *TestTypeList) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

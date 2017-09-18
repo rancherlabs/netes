@@ -91,7 +91,7 @@ func setupOutputWriter(cmd *cobra.Command, defaultWriter io.Writer, filename str
 func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
 	timeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
-		return cmdutil.UsageErrorf(cmd, err.Error())
+		return cmdutil.UsageError(cmd, err.Error())
 	}
 
 	clientset, err := f.ClientSet()
@@ -224,10 +224,10 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error
 	}
 	dir := cmdutil.GetFlagString(cmd, "output-directory")
 	if len(dir) == 0 {
-		dir = "standard output"
+		dir = "."
 	}
 	if dir != "-" {
-		fmt.Fprintf(out, "Cluster info dumped to %s\n", dir)
+		fmt.Fprintf(out, "Cluster info dumped to %s", dir)
 	}
 	return nil
 }
