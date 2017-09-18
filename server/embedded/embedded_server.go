@@ -167,7 +167,7 @@ func genericConfig(config *types.GlobalConfig, cluster *client.Cluster, lookup *
 	genericApiServerConfig.Authenticator = authentication.New(lookup)
 	genericApiServerConfig.Authorizer = authz
 	genericApiServerConfig.PublicAddress = net.ParseIP("169.254.169.250")
-	genericApiServerConfig.ReadWritePort = 81
+	genericApiServerConfig.ReadWritePort = 9347
 	if err != nil {
 		return nil, err
 	}
