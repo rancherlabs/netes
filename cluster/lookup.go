@@ -27,7 +27,7 @@ func NewLookup(clusterURL string) *Lookup {
 }
 
 func (c *Lookup) Lookup(input *http.Request) (*client.Cluster, error) {
-	clusterId := getClusterId(input)
+	clusterId := GetClusterID(input)
 	if clusterId == "" {
 		return nil, nil
 	}
@@ -63,7 +63,12 @@ func (c *Lookup) Lookup(input *http.Request) (*client.Cluster, error) {
 	return cluster, nil
 }
 
-func getClusterId(req *http.Request) string {
+func GetClusterID(req *http.Request) string {
+	clusterID := req.Header.Get("X-API-Cluster-Id")
+	if clusterID != "" {
+		return clusterID
+	}
+
 	parts := strings.Split(req.URL.Path, "/")
 	if len(parts) > 3 && strings.HasPrefix(parts[2], "cluster") {
 		return parts[3]

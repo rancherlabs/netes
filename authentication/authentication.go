@@ -1,13 +1,13 @@
 package authentication
 
 import (
+	"fmt"
 	"net/http"
-	"k8s.io/apiserver/pkg/authentication/user"
+
 	"github.com/rancher/netes/cluster"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
-	"fmt"
-	"github.com/rancher/go-rancher/v3"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 type Authenticator struct {
@@ -21,21 +21,20 @@ func New(clusterLookup *cluster.Lookup) authenticator.Request {
 }
 
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	cluster, ok := req.Context().Value("cluster").(*client.Cluster)
-	if !ok {
+	c := cluster.GetCluster(req.Context())
+	if c == nil {
 		return nil, false, nil
 	}
 
 	attrs := map[string][]string{}
-	for k, v := range cluster.Identity.Attributes {
+	for k, v := range c.Identity.Attributes {
 		attrs[k] = []string{fmt.Sprint(v)}
 	}
 
 	return &user.DefaultInfo{
-		Name: cluster.Identity.Username,
-		UID: cluster.Identity.UserId,
-		Groups: cluster.Identity.Groups,
-		Extra: attrs,
+		Name:   c.Identity.Username,
+		UID:    c.Identity.UserId,
+		Groups: []string{"system:masters"},
+		Extra:  attrs,
 	}, true, nil
 }
-

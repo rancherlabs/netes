@@ -27,8 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// Enable registering packages
-	_ "github.com/rancher/goml-storage/mysql"
 	"strings"
+
+	_ "github.com/rancher/goml-storage/mysql"
 )
 
 type embeddedServer struct {
@@ -43,7 +44,8 @@ func (e *embeddedServer) Close() {
 
 func (e *embeddedServer) Handler() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/v3/clusters/1c1")
+		c := cluster.GetCluster(req.Context())
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/k8s/clusters/" + c.Id)
 		e.master.GenericAPIServer.Handler.ServeHTTP(rw, req)
 	})
 }
@@ -112,16 +114,17 @@ func New(config *types.GlobalConfig, cluster *client.Cluster, lookup *cluster.Lo
 		MasterCount: 1,
 	}
 
-	kubeAPIServer, err := masterConfig.Complete().New(genericapiserver.EmptyDelegate)
+	kubeAPIServer, err := masterConfig.Complete().New(genericapiserver.EmptyDelegate, nil)
 	kubeAPIServer.GenericAPIServer.AddPostStartHook("start-kube-apiserver-informers", func(context genericapiserver.PostStartHookContext) error {
-		clientsetset.ExternalSharedInformers.Start(context.StopCh)
-		clientsetset.InternalSharedInformers.Start(context.StopCh)
+		clientsetset.Start(context.StopCh)
 		return nil
 	})
 	kubeAPIServer.GenericAPIServer.PrepareRun()
 
 	ctx, cancel := context.WithCancel(context.Background())
+
 	kubeAPIServer.GenericAPIServer.RunPostStartHooks(ctx.Done())
+	//go controllermanager.Start(clientsetset, ctx.Done())
 
 	return &embeddedServer{
 		master:  kubeAPIServer,
@@ -131,7 +134,7 @@ func New(config *types.GlobalConfig, cluster *client.Cluster, lookup *cluster.Lo
 }
 
 func serviceNet(config *types.GlobalConfig, cluster *client.Cluster) (net.IPNet, net.IP, error) {
-	cidr := types.FirstNotEmpty(cluster.K8sConfig.ServiceNetCidr, config.ServiceNetCidr)
+	cidr := types.FirstNotEmpty(cluster.K8sServerConfig.ServiceNetCidr, config.ServiceNetCidr)
 	_, cidrNet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return net.IPNet{}, nil, err
@@ -163,12 +166,11 @@ func genericConfig(config *types.GlobalConfig, cluster *client.Cluster, lookup *
 	genericApiServerConfig.RESTOptionsGetter = &store.RESTOptionsFactory{storageFactory}
 	genericApiServerConfig.Authenticator = authentication.New(lookup)
 	genericApiServerConfig.Authorizer = authz
+	genericApiServerConfig.PublicAddress = net.ParseIP("169.254.169.250")
+	genericApiServerConfig.ReadWritePort = 81
 	if err != nil {
 		return nil, err
 	}
 
 	return genericApiServerConfig, nil
-}
-
-type embedded struct {
 }

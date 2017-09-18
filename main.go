@@ -7,9 +7,14 @@ import (
 	"github.com/rancher/netes/master"
 	"github.com/rancher/netes/store"
 	"github.com/rancher/netes/types"
+	"k8s.io/apiserver/pkg/util/logs"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 func main() {
+	utilruntime.ReallyCrash = false
+	logs.InitLogs()
+
 	dsn := os.Getenv("CATTLE_DB_DSN")
 	if dsn == "" {
 		dsn = store.FormatDSN(

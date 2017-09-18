@@ -2,14 +2,13 @@ package router
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/rancher/go-rancher/v3"
 	"github.com/rancher/netes/cluster"
 	"github.com/rancher/netes/server"
 	"github.com/rancher/netes/types"
-	"fmt"
-	"context"
 )
 
 type Router struct {
@@ -26,25 +25,19 @@ func New(config *types.GlobalConfig) *Router {
 
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	fmt.Println("!!!!", req.Method, req.URL.String())
-	cluster, err := r.clusterLookup.Lookup(req)
+
+	c, handler, err := r.serverFactory.Get(req)
 	if err != nil {
 		response(rw, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	if cluster == nil {
-		response(rw, http.StatusNotFound, "No cluster available")
+	if c == nil {
+		response(rw, http.StatusNotFound, "No c available")
 		return
 	}
 
-
-	handler, err := r.serverFactory.Get(cluster)
-	if err != nil {
-		response(rw, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	ctx := context.WithValue(req.Context(), "cluster", cluster)
+	ctx := cluster.StoreCluster(req.Context(), c)
 	handler.ServeHTTP(rw, req.WithContext(ctx))
 }
 
