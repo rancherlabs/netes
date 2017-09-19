@@ -21,7 +21,6 @@ func NewClient(ctx context.Context, dialectName string, db *sql.DB) (kv.Client, 
 		return nil, fmt.Errorf("Failed to find dialect %v", dialectName)
 	}
 
-	fmt.Println("!!!!!!!!!!!!!!!!!!! new DB")
 	client := &client{
 		db:       db,
 		dialect:  dialect,

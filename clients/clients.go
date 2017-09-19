@@ -41,9 +41,9 @@ func New(cluster *client.Cluster) (*ClientSetSet, error) {
 	c := &ClientSetSet{
 		LoopbackClientConfig: rest.Config{
 			Host: "http://localhost:8089/k8s/clusters/" + cluster.Id + "/",
-			//ContentConfig: rest.ContentConfig{
-			//	ContentType: "application/vnd.kubernetes.protobuf",
-			//},
+			ContentConfig: rest.ContentConfig{
+				ContentType: "application/vnd.kubernetes.protobuf",
+			},
 		},
 	}
 

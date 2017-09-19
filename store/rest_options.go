@@ -5,7 +5,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server/storage"
 )
 
@@ -20,8 +19,9 @@ func (f *RESTOptionsFactory) GetRESTOptions(resource schema.GroupResource) (gene
 	}
 
 	ret := generic.RESTOptions{
-		StorageConfig:           storageConfig,
-		Decorator:               registry.StorageWithCacher(100),
+		StorageConfig: storageConfig,
+		//Decorator:     registry.StorageWithCacher(100),
+		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
 		EnableGarbageCollection: true,
 		ResourcePrefix:          f.StorageFactory.ResourcePrefix(resource),

@@ -30,8 +30,7 @@ func StorageFactory(pathPrefix string, config *types.GlobalConfig) (*serverstora
 
 	return kubeapiserver.NewStorageFactory(
 		*storageConfig,
-		//"application/vnd.kubernetes.protobuf",
-		"application/json",
+		"application/vnd.kubernetes.protobuf",
 		api.Codecs,
 		serverstorage.NewDefaultResourceEncodingConfig(api.Registry),
 		nil,

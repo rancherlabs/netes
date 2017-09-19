@@ -24,7 +24,9 @@ func New(config *types.GlobalConfig) *Router {
 }
 
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	fmt.Println("!!!!", req.Method, req.URL.String())
+	if req.Method != "GET" {
+		fmt.Println("!!!!", req.Method, req.URL.String())
+	}
 
 	c, handler, err := r.serverFactory.Get(req)
 	if err != nil {

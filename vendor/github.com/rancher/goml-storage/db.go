@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/goml-storage/kv"
@@ -13,7 +14,12 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
-var ErrNoDSN = errors.New("DB DSN must be set as ServerList")
+var (
+	ErrNoDSN = errors.New("DB DSN must be set as ServerList")
+	// Just assume there is only one for now
+	client     kv.Client
+	clientLock sync.Mutex
+)
 
 func NewRDBMSStorage(c storagebackend.Config) (storage.Interface, factory.DestroyFunc, error) {
 	if len(c.ServerList) != 2 {
@@ -22,15 +28,9 @@ func NewRDBMSStorage(c storagebackend.Config) (storage.Interface, factory.Destro
 
 	driverName, dsn := c.ServerList[0], c.ServerList[1]
 
-	db, err := sql.Open(driverName, dsn)
+	dbClient, err := getClient(driverName, dsn)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "Failed to create DB(%s) connection", driverName)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	destroyFunc := func() {
-		cancel()
-		db.Close()
+		return nil, nil, err
 	}
 
 	transformer := c.Transformer
@@ -38,10 +38,28 @@ func NewRDBMSStorage(c storagebackend.Config) (storage.Interface, factory.Destro
 		transformer = value.NewMutableTransformer(value.IdentityTransformer)
 	}
 
-	dbClient, err := rdbms.NewClient(ctx, driverName, db)
-	if err != nil {
-		return nil, nil, err
+	return kv.New(dbClient, c.Codec, c.Prefix, transformer), func() {}, nil
+}
+
+func getClient(driverName, dsn string) (kv.Client, error) {
+	clientLock.Lock()
+	defer clientLock.Unlock()
+	if client != nil {
+		return client, nil
 	}
 
-	return kv.New(dbClient, c.Codec, c.Prefix, transformer), destroyFunc, nil
+	// Notice that we never close the DB connection or watcher (because this code assumes only one DB)
+	// "Room for improvement"
+	db, err := sql.Open(driverName, dsn)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to create DB(%s) connection", driverName)
+	}
+
+	dbClient, err := rdbms.NewClient(context.Background(), driverName, db)
+	if err != nil {
+		return nil, err
+	}
+
+	client = dbClient
+	return client, nil
 }
