@@ -21,23 +21,37 @@ type Factory struct {
 
 func NewFactory(config *types.GlobalConfig) *Factory {
 	return &Factory{
-		serverLock: locker.New(),
-		config:     config,
+		serverLock:    locker.New(),
+		config:        config,
 		clusterLookup: config.Lookup,
 	}
 }
 
-func (s *Factory) Get(req *http.Request) (*client.Cluster, http.Handler, error) {
-	clusterID := cluster.GetClusterID(req)
+func (s *Factory) lookupCluster(clusterID string) (*client.Cluster, http.Handler) {
 	server, ok := s.servers.Load(clusterID)
 	if ok {
 		if cluster, ok := s.clusters.Load(clusterID); ok {
-			return cluster.(*client.Cluster), server.(Server).Handler(), nil
+			return cluster.(*client.Cluster), server.(Server).Handler()
 		}
+	}
+
+	return nil, nil
+}
+
+func (s *Factory) Get(req *http.Request) (*client.Cluster, http.Handler, error) {
+	clusterID := cluster.GetClusterID(req)
+	cluster, handler := s.lookupCluster(clusterID)
+	if cluster != nil {
+		return cluster, handler, nil
 	}
 
 	s.serverLock.Lock("cluster." + clusterID)
 	defer s.serverLock.Unlock("cluster." + clusterID)
+
+	cluster, handler = s.lookupCluster(clusterID)
+	if cluster != nil {
+		return cluster, handler, nil
+	}
 
 	cluster, err := s.clusterLookup.Lookup(req)
 	if err != nil || cluster == nil {
@@ -48,6 +62,7 @@ func (s *Factory) Get(req *http.Request) (*client.Cluster, http.Handler, error) 
 		cluster.K8sServerConfig = &client.K8sServerConfig{}
 	}
 
+	var server interface{}
 	server, err = s.newServer(cluster)
 	if err != nil || server == nil {
 		return nil, nil, err

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-openapi/spec"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/v3"
 	"github.com/rancher/netes/authentication"
@@ -18,6 +19,7 @@ import (
 	"github.com/rancher/netes/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/version"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/storage"
@@ -30,6 +32,7 @@ import (
 	"strings"
 
 	_ "github.com/rancher/goml-storage/mysql"
+	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
 type embeddedServer struct {
@@ -45,7 +48,7 @@ func (e *embeddedServer) Close() {
 func (e *embeddedServer) Handler() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		c := cluster.GetCluster(req.Context())
-		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/k8s/clusters/" + c.Id)
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/k8s/clusters/"+c.Id)
 		e.master.GenericAPIServer.Handler.ServeHTTP(rw, req)
 	})
 }
@@ -155,7 +158,20 @@ func genericConfig(config *types.GlobalConfig, cluster *client.Cluster, lookup *
 		return nil, err
 	}
 
+	apiVersion := version.Get()
+
 	genericApiServerConfig := genericapiserver.NewConfig(api.Codecs)
+	genericApiServerConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, api.Scheme)
+	genericApiServerConfig.OpenAPIConfig.Info.Title = "Rancher Kubernetes"
+	genericApiServerConfig.OpenAPIConfig.SecurityDefinitions = &spec.SecurityDefinitions{
+		"HTTPBasic": &spec.SecurityScheme{
+			SecuritySchemeProps: spec.SecuritySchemeProps{
+				Type:        "basic",
+				Description: "HTTP Basic authentication",
+			},
+		},
+	}
+	genericApiServerConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	genericApiServerConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
@@ -167,10 +183,9 @@ func genericConfig(config *types.GlobalConfig, cluster *client.Cluster, lookup *
 	genericApiServerConfig.Authenticator = authentication.New(lookup)
 	genericApiServerConfig.Authorizer = authz
 	genericApiServerConfig.PublicAddress = net.ParseIP("169.254.169.250")
-	genericApiServerConfig.ReadWritePort = 9347
-	if err != nil {
-		return nil, err
-	}
+	genericApiServerConfig.ReadWritePort = 9348
+	genericApiServerConfig.EnableDiscovery = true
+	genericApiServerConfig.Version = &apiVersion
 
 	return genericApiServerConfig, nil
 }
