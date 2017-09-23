@@ -68,6 +68,7 @@ import (
 	authenticationrest "k8s.io/kubernetes/pkg/registry/authentication/rest"
 	authorizationrest "k8s.io/kubernetes/pkg/registry/authorization/rest"
 	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
+	batchrest "k8s.io/kubernetes/pkg/registry/batch/rest"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
@@ -255,7 +256,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget,
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
 		autoscalingrest.RESTStorageProvider{},
-		//batchrest.RESTStorageProvider{},
+		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
 		// TODO(enisoc): Remove crdRESTOptionsGetter input argument when TPR code is removed.
 		extensionsrest.RESTStorageProvider{ResourceInterface: thirdparty.NewThirdPartyResourceServer(s, s.DiscoveryGroupManager, c.StorageFactory, crdRESTOptionsGetter)},

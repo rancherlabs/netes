@@ -35,7 +35,7 @@ import (
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 
-	//"github.com/cloudflare/cfssl/helpers"
+	"github.com/cloudflare/cfssl/helpers"
 	"github.com/spf13/pflag"
 )
 
@@ -111,9 +111,9 @@ func NewCMServer() *CMServer {
 			EnableGarbageCollector:                true,
 			ConcurrentGCSyncs:                     20,
 			GCIgnoredResources:                    gcIgnoredResources,
-			//ClusterSigningCertFile:                "/etc/kubernetes/ca/ca.pem",
-			//ClusterSigningKeyFile:                 "/etc/kubernetes/ca/ca.key",
-			//ClusterSigningDuration:                metav1.Duration{Duration: helpers.OneYear},
+			ClusterSigningCertFile:                "/etc/kubernetes/ca/ca.pem",
+			ClusterSigningKeyFile:                 "/etc/kubernetes/ca/ca.key",
+			ClusterSigningDuration:                metav1.Duration{Duration: helpers.OneYear},
 			ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 60 * time.Second},
 			EnableTaintManager:                    true,
 			HorizontalPodAutoscalerUseRESTClients: false,
