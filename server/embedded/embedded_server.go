@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"time"
+	"strings"
 
 	"github.com/go-openapi/spec"
 	"github.com/pkg/errors"
@@ -19,20 +20,15 @@ import (
 	"github.com/rancher/netes/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/version"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/generated/openapi"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/ports"
-
-	// Enable registering packages
-	"strings"
-
-	_ "github.com/rancher/goml-storage/mysql"
-	"k8s.io/kubernetes/pkg/generated/openapi"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 type embeddedServer struct {

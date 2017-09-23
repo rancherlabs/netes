@@ -2,7 +2,6 @@ package router
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/rancher/go-rancher/v3"
@@ -24,10 +23,6 @@ func New(config *types.GlobalConfig) *Router {
 }
 
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if req.Method != "GET" {
-		fmt.Println("!!!!", req.Method, req.URL.String())
-	}
-
 	c, handler, err := r.serverFactory.Get(req)
 	if err != nil {
 		response(rw, http.StatusInternalServerError, err.Error())

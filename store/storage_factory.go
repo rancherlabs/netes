@@ -1,7 +1,8 @@
 package store
 
 import (
-	goml "github.com/rancher/goml-storage"
+	"github.com/rancher/k8s-sql"
+	_ "github.com/rancher/k8s-sql/dialect/mysql"
 	"github.com/rancher/netes/types"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -15,7 +16,7 @@ import (
 const StorageTypeRDBMS = "mysql"
 
 func init() {
-	factory.Register(StorageTypeRDBMS, goml.NewRDBMSStorage)
+	factory.Register(StorageTypeRDBMS, rdbms.NewRDBMSStorage)
 }
 
 func StorageFactory(pathPrefix string, config *types.GlobalConfig) (*serverstorage.DefaultStorageFactory, error) {
@@ -32,7 +33,6 @@ func StorageFactory(pathPrefix string, config *types.GlobalConfig) (*serverstora
 		api.Codecs,
 		serverstorage.NewDefaultResourceEncodingConfig(api.Registry),
 		nil,
-		// TODO: Needed?
 		nil,
 		master.DefaultAPIResourceConfigSource(),
 		flag.ConfigurationMap{
