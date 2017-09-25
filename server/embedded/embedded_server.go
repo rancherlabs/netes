@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"time"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/go-openapi/spec"
 	"github.com/pkg/errors"
@@ -15,6 +16,7 @@ import (
 	"github.com/rancher/netes/authorization"
 	"github.com/rancher/netes/clients"
 	"github.com/rancher/netes/cluster"
+	"github.com/rancher/netes/proxy"
 	"github.com/rancher/netes/server/admission"
 	"github.com/rancher/netes/store"
 	"github.com/rancher/netes/types"
@@ -76,6 +78,8 @@ func New(config *types.GlobalConfig, cluster *client.Cluster, lookup *cluster.Lo
 		return nil, errors.Wrap(err, "Invalid service net cidr")
 	}
 
+	dialer := proxy.NewDialer(cluster, os.Getenv("CATTLE_ACCESS_KEY"), os.Getenv("CATTLE_SECRET_KEY"))
+
 	masterConfig := &master.Config{
 		GenericConfig: genericApiServerConfig,
 
@@ -84,6 +88,7 @@ func New(config *types.GlobalConfig, cluster *client.Cluster, lookup *cluster.Lo
 		EnableCoreControllers:   true,
 		EventTTL:                1 * time.Hour,
 		KubeletClientConfig: kubeletclient.KubeletClientConfig{
+			Dial:         dialer,
 			Port:         ports.KubeletPort,
 			ReadOnlyPort: ports.KubeletReadOnlyPort,
 			PreferredAddressTypes: []string{
@@ -107,6 +112,10 @@ func New(config *types.GlobalConfig, cluster *client.Cluster, lookup *cluster.Lo
 		ServiceIPRange:       serviceIPRange,
 		APIServerServiceIP:   apiServerServiceIP,
 		APIServerServicePort: 443,
+
+		ProxyTransport: &http.Transport{
+			Dial: dialer,
+		},
 
 		ServiceNodePortRange: utilnet.PortRange{Base: 30000, Size: 2768},
 
