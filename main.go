@@ -15,14 +15,20 @@ func main() {
 	utilruntime.ReallyCrash = false
 	logs.InitLogs()
 
-	dsn := os.Getenv("CATTLE_DB_DSN")
+	dsn := os.Getenv("NETES_DB_DSN")
 	if dsn == "" {
+		user := getenv("NETES_MYSQL_USER", "cattle")
+		password := getenv("NETES_MYSQL_PASSWORD", "cattle")
+		address := getenv("NETES_MYSQL_ADDRESS", "localhost:3306")
+		dbName := getenv("NETES_MYSQL_DBNAME", "cattle")
+		params := getenv("NETES_MYSQL_PARAMS", "")
+
 		dsn = store.FormatDSN(
-			"cattle",
-			"cattle",
-			"localhost:3306",
-			"cattle",
-			"",
+			user,
+			password,
+			address,
+			dbName,
+			params,
 		)
 	}
 
@@ -45,4 +51,12 @@ func main() {
 
 	fmt.Fprintf(os.Stdout, "Failed to run netes: %v", err)
 	os.Exit(1)
+}
+
+func getenv(key, def string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		return def
+	}
+	return val
 }
